@@ -6,12 +6,13 @@
 
 - fix(android): Check extras in `ClickActivity`, `ClearReceiver` and `TriggerReceiver` ([#2096](https://github.com/katzer/cordova-plugin-local-notifications/pull/2096))
 
-### Common
+### Others
 
 - chore: bump dev version to 1.2.4-dev ([#2095](https://github.com/katzer/cordova-plugin-local-notifications/pull/2095))
 - doc(readme): improve badges and other minor changes ([#2097](https://github.com/katzer/cordova-plugin-local-notifications/pull/2097))
 - fix(readme): fix badges using this package (#2097) ([#2098](https://github.com/katzer/cordova-plugin-local-notifications/pull/2098))
 - chore(npm-publish.yml): update workflow ([#2101](https://github.com/katzer/cordova-plugin-local-notifications/pull/2101))
+- chore: Rename to `cordova-plugin-local-notifications-continued`, setup fork
 
 ## Version 1.2.3 (22.11.2025)
 
