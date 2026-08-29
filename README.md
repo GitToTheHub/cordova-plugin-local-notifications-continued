@@ -6,6 +6,9 @@
     <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" />
 </a>
 
+> [!WARNING]
+> Since plugin version 1.2.4 (28th August 2026) this plugin will get continued support on the fork [cordova-plugin-local-notifications-continued](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued). This repository will not be maintained anymore.
+
 A notification is a message you display to the user outside of your app's normal UI. When you tell the system to issue a notification, it first appears as an icon in the notification area. To see the details of the notification, the user opens the notification drawer. Both the notification area and the notification drawer are system-controlled areas that the user can view at any time.
 
 <img style="float: right; padding: 20px; padding-right: 40px;" width="320" src="images/android-notification-example.png">
