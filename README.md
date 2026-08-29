@@ -36,8 +36,6 @@ A notification is a message you display to the user outside of your app's normal
 
 ### Installation
 
-The plugin can be installed via [Cordova-CLI][CLI] and is publicly available on [NPM][npm].
-
 #### NPM
 
 ##### Since Version 1.2.4
@@ -1517,27 +1515,17 @@ Example: `shared://myImage.png`
 Android only.
 
 ##### Android
+
 A shared file in `[Installed-App-Path]/files/shared_files`. This is necessary to get useable Uris for asset files, which are the files of the `www` directory. You can also use the `shared_files` directory, to store files created on runtime. To access the directory, you can use [cordova.file.dataDirectory](https://github.com/apache/cordova-plugin-file#where-to-store-files) of the plugin [cordova-plugin-file](https://github.com/apache/cordova-plugin-file) and write to the folder `shared_files`. The folder `shared_files` will be created on plugin initialization.
-
-## Contributing
-
-1. Fork it
-2. Create your feature branch (`git checkout -b my-new-feature`)
-3. Commit your changes (`git commit -am 'Add some feature'`)
-4. Push to the branch (`git push origin my-new-feature`)
-5. Create new Pull Request
 
 ## License
 
-This software is released under the [Apache 2.0 License][apache2_license].
+This software is released under the [Apache 2.0 License](http://opensource.org/licenses/Apache-2.0).
 
-Made with :yum: from Leipzig and continued by Manuel Beck since 2024
+Made with :yum: from Leipzig
 
-© 2013-2023 [appPlant GmbH][appplant]
-<br>© 2024-2026 [Manuel Beck](https://manuelbeck.software)
+Continued by Manuel Beck since 2024
 
-[cordova]: https://cordova.apache.org
-[CLI]: http://cordova.apache.org/docs/en/edge/guide_cli_index.md.html#The%20Command-line%20Interface
-[npm]: https://www.npmjs.com/package/cordova-plugin-local-notification
-[apache2_license]: http://opensource.org/licenses/Apache-2.0
-[appplant]: http://appplant.de
+© 2013-2023 appPlant GmbH (Company does not exists anymore)
+
+© 2024-2026 [Manuel Beck](https://manuelbeck.software)
