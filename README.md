@@ -52,7 +52,7 @@ Install a specific version:
 cordova plugin add cordova-plugin-local-notifications-continued@1.2.4
 ```
 
-##### Version Older Than 1.2.4 (Original from katzer)
+##### Version Older Than 1.2.4 (Original from [katzer/cordova-plugin-local-notifications](https://github.com/katzer/cordova-plugin-local-notifications))
 
 ```bash
 cordova plugin add cordova-plugin-local-notification@1.2.3
