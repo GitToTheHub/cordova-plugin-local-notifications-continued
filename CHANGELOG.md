@@ -5,12 +5,8 @@
 ### Android
 
 - feat(android): add `getChannel(channelId, callback, scope)` to query current channel settings, app notification status, and channel/group blocking without creating the channel. Returns `null` for missing channels or unsupported platforms.
-- refactor(android): use Google's bitmap sample-size helper ([#8](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/8))
-  - Replace the separate size-ratio calculation with `calculateInSampleSize` from the Android documentation, retaining the protection against target dimensions below 1 and separate metadata and decoding options. Sampling behavior is unchanged.
-- fix(android): preserve bitmap resolution for cropping ([#7](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/7))
-  - Follow up to #6: use Google's sample-size calculation to retain sufficient resolution in both dimensions when the original image is large enough, preserving detail when notification icons are cropped.
-- fix(android): downsample notification images during decoding ([#6](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/6))
-  - File-based notification images were decoded at full resolution, potentially using excessive memory and causing a Play Console performance warning. Images are now downsampled during decoding using notification icon dimensions for large icons and person icons, and screen dimensions for picture attachments. Image streams are closed after decoding.
+- fix(android): reduce notification image memory usage while preserving crop quality ([#6](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/6), [#7](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/7), [#8](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/8))
+  - Downsample file-based images during decoding using Google's `calculateInSampleSize` helper, based on notification icon or screen dimensions. Retain enough resolution for cropping, guard against invalid target dimensions, and close image streams to reduce memory usage and address a Play Console performance warning.
   - Fixes [Issue #2103](https://github.com/katzer/cordova-plugin-local-notifications/issues/2103).
 
 ## Version 1.2.4
