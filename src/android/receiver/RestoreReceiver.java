@@ -32,7 +32,7 @@ import android.util.Log;
 import java.util.List;
 
 import de.appplant.cordova.plugin.localnotification.Manager;
-import de.appplant.cordova.plugin.localnotification.Notification;
+import de.appplant.cordova.plugin.localnotification.LocalNotificationRequest;
 
 /**
  * This class is triggered, when the system has cleared the alarms and notifications,
@@ -59,10 +59,10 @@ public class RestoreReceiver extends BroadcastReceiver {
             // The app is granted the SCHEDULE_EXACT_ALARM permission
             intent.getAction().equals(AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED)) {
 
-            List<Notification> notifications = new Manager(context).getNotificationsFromSharedPreferences();
+            List<LocalNotificationRequest> notifications = new Manager(context).getNotificationsFromSharedPreferences();
             Log.d(TAG, "Restoring notifications, count: " + notifications.size());
 
-            for (Notification notification : notifications) {
+            for (LocalNotificationRequest notification : notifications) {
                 try {
                     notification.schedule();
                 } catch (Exception e) {
