@@ -34,7 +34,7 @@ import org.json.JSONObject;
 import org.json.JSONException;
 
 import de.appplant.cordova.plugin.localnotification.LocalNotification;
-import de.appplant.cordova.plugin.localnotification.Notification;
+import de.appplant.cordova.plugin.localnotification.LocalNotificationRequest;
 import de.appplant.cordova.plugin.localnotification.util.AssetUtil;
 
 /**
@@ -149,7 +149,7 @@ public class Action {
         return choices;
     }
 
-    public void handleClick(Intent intent, Notification notification) {
+    public void handleClick(Intent intent, LocalNotificationRequest notification) {
         Log.d(TAG, "Handle action click, options=" + actionOptionsJSON);
 
         // Fire action click event to JS

@@ -27,9 +27,6 @@ package de.appplant.cordova.plugin.localnotification;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.KeyguardManager;
-import android.app.NotificationChannel;
-import android.app.NotificationChannelGroup;
-import android.app.NotificationManager;
 import android.content.Context;
 import android.util.Pair;
 import android.view.View;
@@ -63,7 +60,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import de.appplant.cordova.plugin.localnotification.Manager;
-import de.appplant.cordova.plugin.localnotification.Notification;
+import de.appplant.cordova.plugin.localnotification.LocalNotificationRequest;
 import de.appplant.cordova.plugin.localnotification.Options;
 import de.appplant.cordova.plugin.localnotification.action.ActionGroup;
 import de.appplant.cordova.plugin.localnotification.util.AssetUtil;
@@ -71,8 +68,8 @@ import de.appplant.cordova.plugin.localnotification.util.CallbackContextUtil;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
-import static de.appplant.cordova.plugin.localnotification.Notification.Type.SCHEDULED;
-import static de.appplant.cordova.plugin.localnotification.Notification.Type.TRIGGERED;
+import static de.appplant.cordova.plugin.localnotification.LocalNotificationRequest.Type.SCHEDULED;
+import static de.appplant.cordova.plugin.localnotification.LocalNotificationRequest.Type.TRIGGERED;
 
 /**
  * This plugin utilizes the Android AlarmManager in combination with local
@@ -332,7 +329,7 @@ public class LocalNotification extends CordovaPlugin {
 
     /**
      * Schedule one or multiple local notifications.
-     * Handles exceptions from Notification.scheduleNext(): invalid channel/group or alarm
+     * Handles exceptions from LocalNotificationRequest.scheduleNext(): invalid channel/group or alarm
      * parameters, channel/alarm limits (commonly 500 alarms per app; device-dependent),
      * and denied alarm or sound URI access. Logs the
      * failure and sends it to JavaScript through callbackContext.error(), then stops the
@@ -342,7 +339,7 @@ public class LocalNotification extends CordovaPlugin {
      */
     private void schedule(JSONArray optionsJSONList, CallbackContext callbackContext) {
         for (int index = 0; index < optionsJSONList.length(); index++) {
-            Notification notification = new Notification(getContext(), optionsJSONList.optJSONObject(index));
+            LocalNotificationRequest notification = new LocalNotificationRequest(getContext(), optionsJSONList.optJSONObject(index));
             boolean scheduled;
             try {
                 scheduled = notification.scheduleNext();
@@ -364,7 +361,7 @@ public class LocalNotification extends CordovaPlugin {
     private void createChannel(JSONArray args, CallbackContext callbackContext) {
         JSONObject options = args.optJSONObject(0);
         try {
-            Manager.createChannel(getContext(), new Options(getContext(), options));
+            getChannels().create(new Options(getContext(), options));
             callbackContext.success();
         } catch (Exception e) {
             Log.e(TAG, "Could not create notification channel, channelId="
@@ -374,120 +371,52 @@ public class LocalNotification extends CordovaPlugin {
         }
     }
 
-    /** Create or update a group without overriding the user's blocked state. */
     private void createChannelGroup(JSONArray args, CallbackContext callbackContext) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            successBoolean(callbackContext, false);
-            return;
-        }
         JSONObject options = args.optJSONObject(0);
-        if (options == null || options.optString("id").isEmpty() || options.optString("name").isEmpty()) {
-            callbackContext.error("Channel group requires id and name");
-            return;
-        }
         try {
-            NotificationChannelGroup group = new NotificationChannelGroup(options.optString("id"), options.optString("name"));
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                group.setDescription(options.optString("description", null));
-            }
-            NotificationManagerCompat.from(getContext()).createNotificationChannelGroup(group);
-            successBoolean(callbackContext, true);
+            successBoolean(callbackContext, getChannels().createGroup(options));
         } catch (Exception e) {
-            Log.e(TAG, "Could not create notification channel group, groupId=" + options.optString("id"), e);
+            Log.e(TAG, "Could not create notification channel group, groupId="
+                + (options == null ? null : options.optString("id")), e);
             callbackContext.error(e.getMessage());
         }
     }
 
-    /** Read current group settings; querying a missing group has no side effects. */
     private void getChannelGroup(JSONArray args, CallbackContext callbackContext) {
-        NotificationChannelGroup group = null;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            group = NotificationManagerCompat.from(getContext()).getNotificationChannelGroup(args.optString(0));
-        }
-        if (group == null) {
-            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, (String) null));
-            return;
-        }
         try {
-            JSONObject result = new JSONObject();
-            result.put("id", group.getId());
-            result.put("name", group.getName().toString());
-            String description = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ? group.getDescription() : null;
-            result.put("description", description == null ? JSONObject.NULL : description);
-            result.put("blocked", Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && group.isBlocked());
-            JSONArray channelIds = new JSONArray();
-            for (NotificationChannel channel : group.getChannels()) {
-                channelIds.put(channel.getId());
+            JSONObject result = getChannels().getGroup(args.optString(0));
+            if (result == null) {
+                callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, (String) null));
+            } else {
+                callbackContext.success(result);
             }
-            result.put("channelIds", channelIds);
-            callbackContext.success(result);
         } catch (JSONException e) {
             Log.e(TAG, "Could not read notification channel group, groupId=" + args.optString(0), e);
             callbackContext.error("Could not read notification channel group: " + e.getMessage());
         }
     }
 
-    /** Android also deletes the channels belonging to the deleted group. */
     private void deleteChannelGroup(JSONArray args, CallbackContext callbackContext) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            successBoolean(callbackContext, false);
-            return;
-        }
-        NotificationManagerCompat.from(getContext()).deleteNotificationChannelGroup(args.optString(0));
-        successBoolean(callbackContext, true);
+        successBoolean(callbackContext, getChannels().deleteGroup(args.optString(0)));
     }
 
-    /**
-     * Read a channel's current system settings without creating or changing it.
-     */
     private void getChannel(JSONArray args, CallbackContext callbackContext) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, (String) null));
-            return;
-        }
-
-        NotificationManagerCompat manager = NotificationManagerCompat.from(getContext());
-        NotificationChannel channel = manager.getNotificationChannel(args.optString(0));
-        if (channel == null) {
-            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, (String) null));
-            return;
-        }
-
-        boolean groupBlocked = false;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && channel.getGroup() != null) {
-            NotificationChannelGroup group = manager.getNotificationChannelGroup(channel.getGroup());
-            groupBlocked = group != null && group.isBlocked();
-        }
-
         try {
-            JSONObject result = new JSONObject();
-            result.put("id", channel.getId());
-            result.put("name", channel.getName().toString());
-            result.put("description", channel.getDescription() == null ? JSONObject.NULL : channel.getDescription());
-            result.put("importance", channel.getImportance());
-            result.put("blocked", channel.getImportance() == NotificationManager.IMPORTANCE_NONE);
-            result.put("appNotificationsEnabled", manager.areNotificationsEnabled());
-            result.put("groupId", channel.getGroup() == null ? JSONObject.NULL : channel.getGroup());
-            result.put("groupBlocked", groupBlocked);
-            Uri sound = channel.getSound();
-            result.put("sound", sound == null || Uri.EMPTY.equals(sound) ? JSONObject.NULL : sound.toString());
-            result.put("vibration", channel.shouldVibrate());
-            result.put("lights", channel.shouldShowLights());
-            result.put("showBadge", channel.canShowBadge());
-            callbackContext.success(result);
+            JSONObject result = getChannels().get(args.optString(0));
+            if (result == null) {
+                callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, (String) null));
+            } else {
+                callbackContext.success(result);
+            }
         } catch (JSONException e) {
             Log.e(TAG, "Could not read notification channel, channelId=" + args.optString(0), e);
             callbackContext.error("Could not read notification channel: " + e.getMessage());
         }
     }
 
-    /**
-     * Deletes a notification channel by an id.
-     * @param args Contains the channel id as a String.
-     */
     private void deleteChannel(JSONArray args, CallbackContext callbackContext) {
         try {
-            getManager().deleteChannel(args.optString(0));
+            getChannels().delete(args.optString(0));
             callbackContext.success();
         } catch (Exception e) {
             Log.e(TAG, "Could not delete notification channel, channelId=" + args.optString(0), e);
@@ -505,7 +434,7 @@ public class LocalNotification extends CordovaPlugin {
 
             JSONObject updateOptions = optionsList.optJSONObject(index);
             int notificationId = updateOptions.optInt("id", 0);
-            Notification notification = getManager().update(notificationId, updateOptions);
+            LocalNotificationRequest notification = getManager().update(notificationId, updateOptions);
             
             // Notification didn't exist and couldn't be updated
             if (notification == null) continue;
@@ -522,7 +451,7 @@ public class LocalNotification extends CordovaPlugin {
      */
     private void cancel(JSONArray args, CallbackContext callbackContext) {
         for (int argsIndex = 0; argsIndex < args.length(); argsIndex++) {
-            Notification notification = Notification.getFromSharedPreferences(getContext(), args.optInt(argsIndex, 0));
+            LocalNotificationRequest notification = LocalNotificationRequest.getFromSharedPreferences(getContext(), args.optInt(argsIndex, 0));
             if (notification != null) notification.cancel();
         }
 
@@ -544,7 +473,7 @@ public class LocalNotification extends CordovaPlugin {
      */
     private void clear(JSONArray args, CallbackContext callbackContext) {
         for (int argsIndex = 0; argsIndex < args.length(); argsIndex++) {
-            Notification notification = Notification.getFromSharedPreferences(getContext(), args.optInt(argsIndex, 0));
+            LocalNotificationRequest notification = LocalNotificationRequest.getFromSharedPreferences(getContext(), args.optInt(argsIndex, 0));
             if (notification != null) notification.clear();
         }
 
@@ -564,7 +493,7 @@ public class LocalNotification extends CordovaPlugin {
      * Get the type of the notification (unknown, scheduled, triggered).
      */
     private void type(JSONArray args, CallbackContext callbackContext) {
-        Notification notification = Notification.getFromSharedPreferences(getContext(), args.optInt(0));
+        LocalNotificationRequest notification = LocalNotificationRequest.getFromSharedPreferences(getContext(), args.optInt(0));
 
         if (notification == null) {
             callbackContext.success("unknown");
@@ -615,7 +544,7 @@ public class LocalNotification extends CordovaPlugin {
      * Sends options from a notification to WebView
      */
     private void notification(JSONArray args, CallbackContext callbackContext) {
-        Notification notification = Notification.getFromSharedPreferences(getContext(), args.optInt(0));
+        LocalNotificationRequest notification = LocalNotificationRequest.getFromSharedPreferences(getContext(), args.optInt(0));
 
         if (notification != null) {
             callbackContext.success(notification.getOptions().getJSON());
@@ -630,7 +559,7 @@ public class LocalNotification extends CordovaPlugin {
     private void notifications(JSONArray args, CallbackContext callbackContext) {
         int type = args.optInt(0);
         JSONArray ids = args.optJSONArray(1);
-        List<Notification> notifications = new ArrayList<Notification>();
+        List<LocalNotificationRequest> notifications = new ArrayList<LocalNotificationRequest>();
 
         switch (type) {
             case 0:
@@ -649,7 +578,7 @@ public class LocalNotification extends CordovaPlugin {
 
         ArrayList<JSONObject> options = new ArrayList<JSONObject>();
 
-        for (Notification notification : notifications) {
+        for (LocalNotificationRequest notification : notifications) {
             options.add(notification.getOptions().getJSON());
         }
 
@@ -784,7 +713,7 @@ public class LocalNotification extends CordovaPlugin {
      * @param event        The event name.
      * @param notification Optional notification to pass with.
      */
-    public static void fireEvent(String event, Notification notification) {
+    public static void fireEvent(String event, LocalNotificationRequest notification) {
         fireEvent(event, notification, null);
     }
 
@@ -795,7 +724,7 @@ public class LocalNotification extends CordovaPlugin {
      * @param notification Optional notification to pass with.
      * @param eventData Event object with additional data.
      */
-    public static void fireEvent(String event, Notification notification, JSONObject eventData) {
+    public static void fireEvent(String event, LocalNotificationRequest notification, JSONObject eventData) {
         if (eventData == null) eventData = new JSONObject();
 
         try {
@@ -908,9 +837,12 @@ public class LocalNotification extends CordovaPlugin {
         return list;
     }
 
-    /**
-     * Notification manager instance.
-     */
+    /** Channel operations shared with LocalNotificationRequest. */
+    private LocalNotificationChannels getChannels() {
+        return new LocalNotificationChannels(getContext());
+    }
+
+    /** Stored notification operations. */
     private Manager getManager() {
         return new Manager(getContext());
     }

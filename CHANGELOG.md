@@ -8,6 +8,7 @@
 
 ### Android
 
+- refactor(android): consolidate channel and channel-group operations in `LocalNotificationChannels` and rename the plugin notification model to `LocalNotificationRequest` to distinguish it from Android framework classes.
 - feat(android): support notification channel groups with `createChannelGroup()`, `getChannelGroup()`, `deleteChannelGroup()`, and `androidChannelGroupId`. Group creation and assignment require Android 8; descriptions and group blocking require Android 9. Deleting a group also deletes its channels.
 - feat(android): add `getChannel(channelId, callback, scope)` to query current channel settings, app notification status, and channel/group blocking without creating the channel. Returns `null` for missing channels or unsupported platforms.
 - refactor(android): use Google's bitmap sample-size helper ([#8](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/8))
