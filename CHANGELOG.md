@@ -4,6 +4,7 @@
 
 ### Android
 
+- Downsample file-based notification images during decoding to reduce memory usage. Use notification icon dimensions for large icons and person icons, and screen dimensions for picture attachments. Close image streams after decoding. Fixes [Issue #2103](https://github.com/katzer/cordova-plugin-local-notifications/issues/2103).
 - fix(android): Check extras in `ClickActivity`, `ClearReceiver` and `TriggerReceiver` ([#2096](https://github.com/katzer/cordova-plugin-local-notifications/pull/2096))
 
 ### Others

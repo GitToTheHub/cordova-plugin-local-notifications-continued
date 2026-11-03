@@ -280,6 +280,25 @@ public final class AssetUtil {
      * @return The bitmap or null if the resource could not be found, or an {@link IOException} occurred.
      */
     public Bitmap getBitmap(String resourcePath) {
+        // Use the display dimensions in pixels to choose a suitable decoding resolution.
+        // Smaller images are not upscaled.
+        // Note: Power-of-two subsampling intentionally retains enough resolution for display,
+        // so a decoded dimension can be up to almost twice its target size.
+        return getBitmap(resourcePath,
+            context.getResources().getDisplayMetrics().widthPixels,
+            context.getResources().getDisplayMetrics().heightPixels);
+    }
+
+    /**
+     * Load an icon using the system notification icon dimensions in pixels.
+     */
+    public Bitmap getIconBitmap(String resourcePath) {
+        return getBitmap(resourcePath,
+            context.getResources().getDimensionPixelSize(android.R.dimen.notification_large_icon_width),
+            context.getResources().getDimensionPixelSize(android.R.dimen.notification_large_icon_height));
+    }
+
+    private Bitmap getBitmap(String resourcePath, int requestedWidth, int requestedHeight) {
         // Check if uri exists
         Uri resourceUri = getUri(resourcePath, AssetUtil.RESOURCE_TYPE_DRAWABLE);
         if (resourceUri == Uri.EMPTY) return null;
@@ -291,7 +310,7 @@ public final class AssetUtil {
             // Get bitmap from file
         } else {
             try {
-                return getBitmapFromUri(resourceUri);
+                return getBitmapFromUri(resourceUri, requestedWidth, requestedHeight);
             } catch (IOException exception){
                 Log.e(TAG, "Could not get bitmap" + resourcePath, exception);
                 return null;
@@ -299,10 +318,80 @@ public final class AssetUtil {
         }
     }
     /**
-     * Convert Uri to Bitmap.
+     * Load an image from a Uri without allocating its full-resolution pixels unnecessarily.
+     * First read its dimensions, then load the pixels with a suitable reduction factor.
+     * @param uri Image location accessible through the content resolver.
+     * @param requestedWidth Target display width in pixels.
+     * @param requestedHeight Target display height in pixels.
+     * @return The decoded bitmap, or null if the stream or image dimensions are unavailable.
+     * @throws IOException If opening, reading or closing an image stream fails.
      */
-    public Bitmap getBitmapFromUri(Uri uri) throws IOException {
-        return BitmapFactory.decodeStream(context.getContentResolver().openInputStream(uri));
+    private Bitmap getBitmapFromUri(Uri uri, int requestedWidth, int requestedHeight) throws IOException {
+        BitmapFactory.Options metadata = getBitmapMetadata(uri);
+        if (metadata == null) return null;
+
+        // Decoding at a reduced resolution requires usable image dimensions.
+        if (metadata.outWidth <= 0 || metadata.outHeight <= 0) return null;
+
+        int ratio = calculateSizeRatio(
+            metadata.outWidth, metadata.outHeight, requestedWidth, requestedHeight);
+
+        // BitmapFactory.Options.inSampleSize reduces both dimensions during decoding:
+        // 4 means roughly 1/4 the width and height, requiring about 1/16 the pixel memory
+        // of the original image.
+        // A power of two is a value from the sequence 1, 2, 4, 8, 16, 32, ... (2 raised to an integer power).
+        // BitmapFactory decoders may round other sample sizes down to a power of two.
+        //
+        // Integer.highestOneBit explicitly selects the largest power of two not greater than the ratio.
+        // For example, ratio 6 becomes 4, retaining enough detail for display.
+        // A minimum of 1 keeps smaller images at their original size without upscaling.
+        BitmapFactory.Options decodeOptions = new BitmapFactory.Options();
+        decodeOptions.inSampleSize = Integer.highestOneBit(Math.max(1, ratio));
+
+        // Open a fresh stream because the first pass consumed image data and content streams
+        // do not necessarily support rewinding with reset(). This stream is also closed automatically.
+        try (InputStream stream = context.getContentResolver().openInputStream(uri)) {
+            if (stream == null) return null;
+            return BitmapFactory.decodeStream(stream, null, decodeOptions);
+        }
+    }
+
+    /**
+     * Calculate the larger of the width and height ratios between an original and a target size.
+     * @param width Original width; must be non-negative and use the same unit as requestedWidth.
+     * @param height Original height; must be non-negative and use the same unit as requestedHeight.
+     * @param requestedWidth Target width; values below 1 are treated as 1.
+     * @param requestedHeight Target height; values below 1 are treated as 1.
+     * @return The larger ratio, rounded down by integer division. Can be 0 for smaller originals.
+     */
+    private static int calculateSizeRatio(int width, int height,
+            int requestedWidth, int requestedHeight) {
+        // Compare both dimensions so very wide or tall originals are also taken into account.
+        // Clamp target dimensions to at least 1 to prevent division by zero.
+        return Math.max(width / Math.max(1, requestedWidth),
+            height / Math.max(1, requestedHeight));
+    }
+
+    /**
+     * Read image metadata without allocating a bitmap for the pixels.
+     * @return Options containing the available image metadata, or null if no stream is available.
+     * Metadata fields may be unset if the image format is unsupported or the data is invalid.
+     * Callers must check the fields they need before using them.
+     * @throws IOException If opening, reading or closing the stream fails.
+     */
+    private BitmapFactory.Options getBitmapMetadata(Uri uri) throws IOException {
+        BitmapFactory.Options options = new BitmapFactory.Options();
+
+        // Set inJustDecodeBounds to true to avoid allocating memory for the bitmap pixels.
+        options.inJustDecodeBounds = true;
+
+        // try-with-resources closes the stream automatically, including on errors or early returns.
+        try (InputStream stream = context.getContentResolver().openInputStream(uri)) {
+            if (stream == null) return null;
+            BitmapFactory.decodeStream(stream, null, options);
+        }
+
+        return options;
     }
 
     /**

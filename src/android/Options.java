@@ -842,7 +842,7 @@ public final class Options {
             JSONObject messageJSON = messagesJSONArray.optJSONObject(i);
 
             // Use person icon if available
-            Bitmap personBitmap = assetUtil.getBitmap(messageJSON.optString("personIcon", null));
+            Bitmap personBitmap = assetUtil.getIconBitmap(messageJSON.optString("personIcon", null));
             IconCompat personIcon = personBitmap != null ? IconCompat.createWithBitmap(AssetUtil.getCircleBitmap(personBitmap)) : null;
 
             messages[i] = new MessagingStyle.Message(
