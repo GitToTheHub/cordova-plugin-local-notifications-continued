@@ -11,3 +11,7 @@ Run on Android 8 or newer with notification permission granted. It checks that q
 Then disable notifications for the test app and restart it. The script logs `GET_CHANNEL_NATIVE_PASS app-disabled` if app-level blocking is reported separately from channel blocking. Restore the permission after testing.
 
 The integration script does not test blocked channel groups or the Android 7 fallback. Never run it in a production app.
+
+## Channel Group Integration Test
+
+Load `android/channel-groups.js` in the disposable Cordova app instead of `android/get-channel.js`. On Android 8 or newer it checks group creation, queries, renaming, channel assignment, assigning an existing ungrouped channel without changing importance, preventing channel moves, and cascade deletion. Success logs `CHANNEL_GROUP_NATIVE_ALL_PASS`. It creates and deletes timestamped `group_test_` groups and channels. Group blocking through system settings requires a separate manual test on Android 9 or newer.

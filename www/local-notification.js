@@ -101,6 +101,7 @@ exports._androidSpecificOptions = {
     androidChannelDescription: null,
     androidChannelEnableVibration: false,
     androidChannelId: "default_channel",
+    androidChannelGroupId: null,
     androidChannelImportance: exports._androidChannelImportanceTypes.IMPORTANCE_DEFAULT,
     androidChannelName: "Default channel",
     // soundUsage of a channel. Default is USAGE_NOTIFICATION
@@ -286,6 +287,66 @@ exports.getChannel = function (channelId, callback, scope) {
     }
 
     exports._exec('getChannel', channelId, callback, scope);
+};
+
+/**
+ * Create or update an Android channel group. Existing user blocking is preserved.
+ * @param {Object} options Group id, name, and optional description.
+ * @param {Function} callback Receives true if supported, false otherwise.
+ * @param {Object} scope The callback function's scope.
+ */
+exports.createChannelGroup = function (options, callback, scope) {
+    if (!options || typeof options.id !== 'string' || options.id.length === 0 ||
+        typeof options.name !== 'string' || options.name.length === 0 ||
+        (options.description != null && typeof options.description !== 'string')) {
+        throw new TypeError('Channel group requires non-empty id and name strings and an optional description string');
+    }
+    if (device.platform !== 'Android') {
+        const scopedCallback = exports._callbackWithScope(callback, scope);
+        if (scopedCallback) scopedCallback(false);
+        return;
+    }
+    exports._exec('createChannelGroup', {
+        id: options.id,
+        name: options.name,
+        description: options.description == null ? null : options.description
+    }, callback, scope);
+};
+
+/**
+ * Read an Android channel group without creating it.
+ * @param {string} groupId The group ID.
+ * @param {Function} callback Receives group settings or null if unavailable.
+ * @param {Object} scope The callback function's scope.
+ */
+exports.getChannelGroup = function (groupId, callback, scope) {
+    if (typeof groupId !== 'string' || groupId.length === 0) {
+        throw new TypeError('groupId must be a non-empty string');
+    }
+    if (device.platform !== 'Android') {
+        const scopedCallback = exports._callbackWithScope(callback, scope);
+        if (scopedCallback) scopedCallback(null);
+        return;
+    }
+    exports._exec('getChannelGroup', groupId, callback, scope);
+};
+
+/**
+ * Delete an Android channel group and its channels.
+ * @param {string} groupId The group ID.
+ * @param {Function} callback Receives true if supported, false otherwise.
+ * @param {Object} scope The callback function's scope.
+ */
+exports.deleteChannelGroup = function (groupId, callback, scope) {
+    if (typeof groupId !== 'string' || groupId.length === 0) {
+        throw new TypeError('groupId must be a non-empty string');
+    }
+    if (device.platform !== 'Android') {
+        const scopedCallback = exports._callbackWithScope(callback, scope);
+        if (scopedCallback) scopedCallback(false);
+        return;
+    }
+    exports._exec('deleteChannelGroup', groupId, callback, scope);
 };
 
 /**

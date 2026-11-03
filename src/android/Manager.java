@@ -100,8 +100,20 @@ public final class Manager {
         // Check if channel exists
         NotificationChannel channel = getChannel(context, options);
         
-        // Channel already created
-        if (channel != null) return;
+        String groupId = options.getAndroidChannelGroupId();
+        NotificationManagerCompat manager = NotificationManagerCompat.from(context);
+        if (groupId != null && manager.getNotificationChannelGroup(groupId) == null) {
+            throw new IllegalArgumentException("Create the channel group before using it: " + groupId);
+        }
+
+        // Android permits assigning a previously ungrouped channel, but not moving it.
+        if (channel != null) {
+            if (channel.getGroup() == null && groupId != null) {
+                channel.setGroup(groupId);
+                manager.createNotificationChannel(channel);
+            }
+            return;
+        }
 
         Log.d(TAG, "Create channel" + 
             ", id=" + options.getAndroidChannelId() +
@@ -113,6 +125,7 @@ public final class Manager {
             options.getAndroidChannelId(),
             options.getAndroidChannelName(), options.getAndroidChannelImportance());
 
+        channel.setGroup(groupId);
         channel.setDescription(options.getAndroidChannelDescription());
         channel.enableVibration(options.isAndroidChannelEnableVibration());
         channel.enableLights(options.getAndroidChannelEnableLights());
