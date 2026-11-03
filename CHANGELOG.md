@@ -1,6 +1,6 @@
 # ChangeLog
 
-## Version 1.2.4
+## Version 1.2.5-dev
 
 ### Android
 
@@ -11,6 +11,11 @@
 - fix(android): downsample notification images during decoding ([#6](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/6))
   - File-based notification images were decoded at full resolution, potentially using excessive memory and causing a Play Console performance warning. Images are now downsampled during decoding using notification icon dimensions for large icons and person icons, and screen dimensions for picture attachments. Image streams are closed after decoding.
   - Fixes [Issue #2103](https://github.com/katzer/cordova-plugin-local-notifications/issues/2103).
+
+## Version 1.2.4
+
+### Android
+
 - fix(android): Check extras in `ClickActivity`, `ClearReceiver` and `TriggerReceiver` ([#2096](https://github.com/katzer/cordova-plugin-local-notifications/pull/2096))
 
 ### Others
