@@ -4,6 +4,7 @@
 
 ### Android
 
+- feat(android): support notification channel groups with `createChannelGroup()`, `getChannelGroup()`, `deleteChannelGroup()`, and `androidChannelGroupId`. Group creation and assignment require Android 8; descriptions and group blocking require Android 9. Deleting a group also deletes its channels.
 - feat(android): add `getChannel(channelId, callback, scope)` to query current channel settings, app notification status, and channel/group blocking without creating the channel. Returns `null` for missing channels or unsupported platforms.
 - refactor(android): use Google's bitmap sample-size helper ([#8](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/8))
   - Replace the separate size-ratio calculation with `calculateInSampleSize` from the Android documentation, retaining the protection against target dimensions below 1 and separate metadata and decoding options. Sampling behavior is unchanged.

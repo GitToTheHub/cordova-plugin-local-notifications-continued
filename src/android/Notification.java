@@ -207,8 +207,13 @@ public class Notification {
             return false;
         }
 
-        // Create channel if not exists
-        Manager.createChannel(context, options);
+        // A group may have been deleted since this notification was scheduled.
+        try {
+            Manager.createChannel(context, options);
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Could not create notification channel", e);
+            return false;
+        }
 
         // Store notification data for restoration
         // Needed for ClickActivity and ClearReceiver
