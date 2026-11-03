@@ -915,6 +915,67 @@ Note: This list has still to be documented.
 | un                             | x       | x   | Unlisten to an [Event](#events) |
 | update                         | x       | x  | Updates a single notification or multiple notifications. The notification id has to be set to update a notification. Accepts an obect or an Array. |
 
+### Handle Native Errors
+
+Native methods use a **success callback followed by an error callback**. The former `scope` position is now used for `errorCallback`. Existing calls that pass an object such as `this` in that position remain supported; see [Legacy Callback Context](#legacy-callback-context).
+
+```js
+const notifications = cordova.plugins.notification.local;
+const onError = (error) => {
+    console.error('Notification operation failed:', error);
+};
+
+notifications.createChannel({
+    androidChannelId: 'appointment_reminders',
+    androidChannelName: 'Appointment reminders'
+}, () => {
+    console.log('Channel is ready.');
+}, onError);
+```
+
+The error callback receives the native error value, usually a message string. On a native error, the success callback is not called. Without an error callback, the plugin logs the failed action and its error to the JavaScript console.
+
+| Method | Argument Order |
+| :----- | :------------- |
+| Most native methods | `method(...arguments, successCallback, errorCallback)` |
+| `schedule`, `update` | `method(options, successCallback, errorCallback, args)` |
+| `get` | `get(ids, successCallback, errorCallback)` or `get(successCallback, errorCallback)` |
+
+For scheduling, omit `args` unless you need its existing options:
+
+```js
+cordova.plugins.notification.local.schedule({
+    id: 60,
+    title: 'Appointment reminder',
+    text: 'Your appointment starts soon.',
+    trigger: { in: 5, unit: 'minute' }
+}, (granted) => {
+    console.log('Notification permission:', granted);
+}, (error) => {
+    console.error('Could not schedule the reminder:', error);
+});
+```
+
+Native catches are limited to concrete failure cases: invalid channel settings or missing groups, Android's channel/group limits, deletion of Android's reserved default channel, and invalid or disallowed alarm scheduling. The dispatcher does not catch arbitrary runtime exceptions. Missing channels (`null`), unsupported group APIs (`false`), and permission denial are normal results.
+
+Errors from the automatic permission request are forwarded to the same error callback. A permission denial remains a normal result: `requestPermission()` and the existing `schedule()` / `update()` flow report `false` through their success callback. Synchronous JavaScript validation errors (such as an empty channel ID) still throw a `TypeError` and can be handled with `try` / `catch`.
+
+A failed operation is not a transaction: when scheduling an array, notifications processed before a later failure may already have been scheduled. Channel and alarm scheduling failures during background restoration or recurring scheduling have no active JavaScript callback; the receivers catch and log them natively.
+
+#### Legacy Callback Context
+
+JavaScript distinguishes the argument by its type: a **function** is the error callback; an **object** is treated as the legacy callback context. This preserves calls such as `createChannel(options, onSuccess, this)` and `schedule(options, onSuccess, this, args)` without making `scope` part of the new API. A function in that position is always interpreted as an error callback.
+
+For new code, use arrow functions or `.bind(this)` if a callback needs your app's `this` context:
+
+```js
+cordova.plugins.notification.local.createChannel(options, () => {
+    this.showSuccess();
+}, (error) => {
+    this.showError(error);
+});
+```
+
 ### canScheduleExactAlarms
 <img src="images/android-icon.svg" width="16"> Android only
 
@@ -958,13 +1019,13 @@ Property documentation:
 
 Android 8 and newer. Creates a notification channel group or updates its name and description. Existing channels and the user's blocked setting are preserved.
 
-Signature: `createChannelGroup({ id, name, description }, callback, scope)`.
+Signature: `createChannelGroup({ id, name, description }, callback, errorCallback)`.
 
 - `id` and `name` must be non-empty strings.
 - `description` is a string or `null`; it is supported on Android 9 and newer. Omitting it clears the description when updating a group.
 - The callback receives `true` on Android 8 and newer, or `false` on Android 7 and iOS.
 
-See [Channel Groups](#channel-groups) for a complete example. The optional `scope` sets the callback's `this` context.
+See [Channel Groups](#channel-groups) for a complete example. The optional `errorCallback` receives native failures; see [Handle Native Errors](#handle-native-errors).
 
 ### getChannelGroup
 
@@ -979,7 +1040,7 @@ cordova.plugins.notification.local.getChannelGroup('household', (group) => {
 });
 ```
 
-Signature: `getChannelGroup(groupId, callback, scope)`. `groupId` must be a non-empty string. The callback receives `null` for a missing or deleted group, on Android 7, or on iOS. Otherwise it receives:
+Signature: `getChannelGroup(groupId, callback, errorCallback)`. `groupId` must be a non-empty string. The callback receives `null` for a missing or deleted group, on Android 7, or on iOS. Otherwise it receives:
 
 | Field | Type | Meaning |
 | :---- | :--- | :------ |
@@ -989,7 +1050,7 @@ Signature: `getChannelGroup(groupId, callback, scope)`. `groupId` must be a non-
 | `blocked` | boolean | Whether the user has blocked the group. Supported on Android 9 and newer; otherwise `false`. |
 | `channelIds` | string[] | IDs of the group's current, non-deleted channels. |
 
-The optional `scope` sets the callback's `this` context. Group blocking is separate from app permission and individual channel blocking; [getChannel](#getchannel) reports these settings separately.
+The optional `errorCallback` receives native failures; see [Handle Native Errors](#handle-native-errors). Group blocking is separate from app permission and individual channel blocking; [getChannel](#getchannel) reports these settings separately.
 
 ### deleteChannelGroup
 
@@ -1001,7 +1062,7 @@ cordova.plugins.notification.local.deleteChannelGroup('household', (supported) =
 });
 ```
 
-Signature: `deleteChannelGroup(groupId, callback, scope)`. `groupId` must be a non-empty string. Deleting an unknown group has no effect. The callback receives `true` on Android 8 and newer, or `false` on Android 7 and iOS. The optional `scope` sets the callback's `this` context.
+Signature: `deleteChannelGroup(groupId, callback, errorCallback)`. `groupId` must be a non-empty string. Deleting an unknown group has no effect. The callback receives `true` on Android 8 and newer, or `false` on Android 7 and iOS. The optional `errorCallback` receives native failures; see [Handle Native Errors](#handle-native-errors).
 
 ### getChannel
 
@@ -1026,7 +1087,7 @@ cordova.plugins.notification.local.getChannel('appointment_reminders', (channel)
 });
 ```
 
-Signature: `getChannel(channelId, callback, scope)`. `channelId` must be a non-empty string. The optional `scope` sets the callback's `this` context.
+Signature: `getChannel(channelId, callback, errorCallback)`. `channelId` must be a non-empty string. The optional `errorCallback` receives native failures; see [Handle Native Errors](#handle-native-errors).
 
 The callback receives `null` when the channel does not exist (including a deleted channel), on Android 7, or on iOS. When channels are supported, a missing channel is different from an existing blocked channel. In particular, the default channel may not exist until a notification first creates it.
 

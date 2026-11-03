@@ -331,31 +331,45 @@ public class LocalNotification extends CordovaPlugin {
     }
 
     /**
-     * Schedule one or multiple local notifications
+     * Schedule one or multiple local notifications.
+     * Handles exceptions from Notification.scheduleNext(): invalid channel/group or alarm
+     * parameters, channel/alarm limits (commonly 500 alarms per app; device-dependent),
+     * and denied alarm or sound URI access. Logs the
+     * failure and sends it to JavaScript through callbackContext.error(), then stops the
+     * batch. Previously processed notifications are not rolled back.
      * @param optionsJSONList The notifications to schedule.
+     * @param callbackContext Receives the permission status on success or a scheduling error.
      */
     private void schedule(JSONArray optionsJSONList, CallbackContext callbackContext) {
         for (int index = 0; index < optionsJSONList.length(); index++) {
             Notification notification = new Notification(getContext(), optionsJSONList.optJSONObject(index));
-            if (notification.scheduleNext()) fireEvent("add", notification);
+            boolean scheduled;
+            try {
+                scheduled = notification.scheduleNext();
+            } catch (Exception e) {
+                // Invalid channel/group configuration, channel limits, or denied alarm/sound access.
+                Log.e(TAG, "Could not schedule notification, notificationId=" + notification.getId()
+                    + ", channelId=" + notification.getOptions().getAndroidChannelId()
+                    + ", groupId=" + notification.getOptions().getAndroidChannelGroupId(), e);
+                callbackContext.error(e.getMessage());
+                return;
+            }
+            if (scheduled) fireEvent("add", notification);
         }
 
         hasPermission(callbackContext);
     }    
     
-    /**
-     * Create Notification channel with options.
-     *
-     * @param args  The channel options.
-     * @param callbackContext The callback context used when calling back into
-     *                JavaScript.
-     */
+    /** Create a channel, reporting API failures to the JavaScript caller. */
     private void createChannel(JSONArray args, CallbackContext callbackContext) {
+        JSONObject options = args.optJSONObject(0);
         try {
-            Manager.createChannel(getContext(), new Options(getContext(), args.optJSONObject(0)));
+            Manager.createChannel(getContext(), new Options(getContext(), options));
             callbackContext.success();
-        } catch (IllegalArgumentException e) {
-            Log.e(TAG, "Could not create notification channel", e);
+        } catch (Exception e) {
+            Log.e(TAG, "Could not create notification channel, channelId="
+                + (options == null ? null : options.optString("androidChannelId"))
+                + ", groupId=" + (options == null ? null : options.optString("androidChannelGroupId", null)), e);
             callbackContext.error(e.getMessage());
         }
     }
@@ -371,12 +385,17 @@ public class LocalNotification extends CordovaPlugin {
             callbackContext.error("Channel group requires id and name");
             return;
         }
-        NotificationChannelGroup group = new NotificationChannelGroup(options.optString("id"), options.optString("name"));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            group.setDescription(options.optString("description", null));
+        try {
+            NotificationChannelGroup group = new NotificationChannelGroup(options.optString("id"), options.optString("name"));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                group.setDescription(options.optString("description", null));
+            }
+            NotificationManagerCompat.from(getContext()).createNotificationChannelGroup(group);
+            successBoolean(callbackContext, true);
+        } catch (Exception e) {
+            Log.e(TAG, "Could not create notification channel group, groupId=" + options.optString("id"), e);
+            callbackContext.error(e.getMessage());
         }
-        NotificationManagerCompat.from(getContext()).createNotificationChannelGroup(group);
-        successBoolean(callbackContext, true);
     }
 
     /** Read current group settings; querying a missing group has no side effects. */
@@ -403,6 +422,7 @@ public class LocalNotification extends CordovaPlugin {
             result.put("channelIds", channelIds);
             callbackContext.success(result);
         } catch (JSONException e) {
+            Log.e(TAG, "Could not read notification channel group, groupId=" + args.optString(0), e);
             callbackContext.error("Could not read notification channel group: " + e.getMessage());
         }
     }
@@ -456,6 +476,7 @@ public class LocalNotification extends CordovaPlugin {
             result.put("showBadge", channel.canShowBadge());
             callbackContext.success(result);
         } catch (JSONException e) {
+            Log.e(TAG, "Could not read notification channel, channelId=" + args.optString(0), e);
             callbackContext.error("Could not read notification channel: " + e.getMessage());
         }
     }
@@ -465,8 +486,13 @@ public class LocalNotification extends CordovaPlugin {
      * @param args Contains the channel id as a String.
      */
     private void deleteChannel(JSONArray args, CallbackContext callbackContext) {
-        getManager().deleteChannel(args.optString(0));
-        callbackContext.success();
+        try {
+            getManager().deleteChannel(args.optString(0));
+            callbackContext.success();
+        } catch (Exception e) {
+            Log.e(TAG, "Could not delete notification channel, channelId=" + args.optString(0), e);
+            callbackContext.error(e.getMessage());
+        }
     }
 
     /**

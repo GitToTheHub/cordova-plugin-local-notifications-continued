@@ -2,6 +2,10 @@
 
 ## Version 1.2.5-dev
 
+### Common
+
+- fix: expose native errors through `successCallback, errorCallback` on callback-based native bridge methods; interpret legacy scope objects dynamically, log unhandled errors, preserve scheduling options and permission-denial results, and forward channel creation failures during explicit scheduling instead of reporting success.
+
 ### Android
 
 - feat(android): support notification channel groups with `createChannelGroup()`, `getChannelGroup()`, `deleteChannelGroup()`, and `androidChannelGroupId`. Group creation and assignment require Android 8; descriptions and group blocking require Android 9. Deleting a group also deletes its channels.

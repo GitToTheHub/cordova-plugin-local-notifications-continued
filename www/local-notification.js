@@ -261,21 +261,23 @@ exports.getDefaults = function () {
  * Android only: Create notification channel
  * @param {Object} options channel options
  * @param {Function} callback The function to be exec as the callback
- * @param {Object} scope The callback function's scope
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.createChannel = function (options, callback, scope) {
+exports.createChannel = function (options, callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     options = exports._optionsWithDefaults(options)
     exports._prepareOptions(options);
-    exports._exec('createChannel', options, callback, scope);
+    exports._exec('createChannel', options, callback, scope, errorCallback);
 };
 
 /**
  * Read the current Android notification channel settings without creating it.
  * @param {string} channelId The channel ID.
  * @param {Function} callback Receives the channel settings or null if unavailable.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.getChannel = function (channelId, callback, scope) {
+exports.getChannel = function (channelId, callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     if (typeof channelId !== 'string' || channelId.length === 0) {
         throw new TypeError('channelId must be a non-empty string');
     }
@@ -286,16 +288,17 @@ exports.getChannel = function (channelId, callback, scope) {
         return;
     }
 
-    exports._exec('getChannel', channelId, callback, scope);
+    exports._exec('getChannel', channelId, callback, scope, errorCallback);
 };
 
 /**
  * Create or update an Android channel group. Existing user blocking is preserved.
  * @param {Object} options Group id, name, and optional description.
  * @param {Function} callback Receives true if supported, false otherwise.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.createChannelGroup = function (options, callback, scope) {
+exports.createChannelGroup = function (options, callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     if (!options || typeof options.id !== 'string' || options.id.length === 0 ||
         typeof options.name !== 'string' || options.name.length === 0 ||
         (options.description != null && typeof options.description !== 'string')) {
@@ -310,16 +313,17 @@ exports.createChannelGroup = function (options, callback, scope) {
         id: options.id,
         name: options.name,
         description: options.description == null ? null : options.description
-    }, callback, scope);
+    }, callback, scope, errorCallback);
 };
 
 /**
  * Read an Android channel group without creating it.
  * @param {string} groupId The group ID.
  * @param {Function} callback Receives group settings or null if unavailable.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.getChannelGroup = function (groupId, callback, scope) {
+exports.getChannelGroup = function (groupId, callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     if (typeof groupId !== 'string' || groupId.length === 0) {
         throw new TypeError('groupId must be a non-empty string');
     }
@@ -328,16 +332,17 @@ exports.getChannelGroup = function (groupId, callback, scope) {
         if (scopedCallback) scopedCallback(null);
         return;
     }
-    exports._exec('getChannelGroup', groupId, callback, scope);
+    exports._exec('getChannelGroup', groupId, callback, scope, errorCallback);
 };
 
 /**
  * Delete an Android channel group and its channels.
  * @param {string} groupId The group ID.
  * @param {Function} callback Receives true if supported, false otherwise.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.deleteChannelGroup = function (groupId, callback, scope) {
+exports.deleteChannelGroup = function (groupId, callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     if (typeof groupId !== 'string' || groupId.length === 0) {
         throw new TypeError('groupId must be a non-empty string');
     }
@@ -346,7 +351,7 @@ exports.deleteChannelGroup = function (groupId, callback, scope) {
         if (scopedCallback) scopedCallback(false);
         return;
     }
-    exports._exec('deleteChannelGroup', groupId, callback, scope);
+    exports._exec('deleteChannelGroup', groupId, callback, scope, errorCallback);
 };
 
 /**
@@ -357,48 +362,56 @@ exports.deleteChannelGroup = function (groupId, callback, scope) {
  *
  * @param {string} channelId Channel ID to delete. Has to be a string like "my_channel_id"
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope  The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.deleteChannel = function (channelId, callback, scope) {
-    exports._exec('deleteChannel', channelId, callback, scope);
+exports.deleteChannel = function (channelId, callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    exports._exec('deleteChannel', channelId, callback, scope, errorCallback);
 };
 
 /**
  * Check permission to show notifications.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.hasPermission = function (callback, scope) {
-    exports._exec('hasPermission', null, callback, scope);
+exports.hasPermission = function (callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    exports._exec('hasPermission', null, callback, scope, errorCallback);
 };
 
 /**
  * Request permission to show notifications.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.requestPermission = function (callback, scope) {
+exports.requestPermission = function (callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     console.log("Requesting permission");
-    exports._exec('requestPermission', null, callback, scope);
+    exports._exec('requestPermission', null, callback, scope, errorCallback);
 };
 
 /**
  * Android only: Check permission to schedule exact alarms.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.canScheduleExactAlarms = function (callback, scope) {
-    exports._exec('canScheduleExactAlarms', null, callback, scope);
+exports.canScheduleExactAlarms = function (callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    exports._exec('canScheduleExactAlarms', null, callback, scope, errorCallback);
 };
 
 /**
  * Schedule notifications
  * @param {Object|Array} optionsArg The notifications to schedule
  * @param {Function} callback
- * @param {Object} scope The callback function's scope.
  * @param {Object} args Optional, can be {skipPermission: true} to skip the permission check
+ * @param {Function|Object} errorCallback Receives native scheduling errors (e.g. invalid channel/group
+ * settings, channel/alarm limits, invalid alarm parameters, or denied alarm/sound access).
+ * Permission denial is reported as callback(false); native errors are not thrown in JavaScript.
+ * Omitted error handlers log to the console.
  */
-exports.schedule = function (optionsArg, callback, scope, args) {
+exports.schedule = function (optionsArg, callback, errorCallback, args) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     let optionsList = exports._toArray(optionsArg);
 
     for (let i = 0; i < optionsList.length; i++) {
@@ -433,7 +446,7 @@ exports.schedule = function (optionsArg, callback, scope, args) {
     // Skip permission check if requested and schedule directly
     if (args && args.skipPermission) {
         console.log("Skip permission check");
-        exports._exec('schedule', optionsList, callback, scope);
+        exports._exec('schedule', optionsList, callback, scope, errorCallback);
 
         // Ask for permission
     } else {
@@ -445,8 +458,8 @@ exports.schedule = function (optionsArg, callback, scope, args) {
                 return;
             }
 
-            exports._exec('schedule', optionsList, callback, scope);
-        }, this);
+            exports._exec('schedule', optionsList, callback, scope, errorCallback);
+        }, exports._callbackWithScope(errorCallback, scope));
     }
 };
 
@@ -454,10 +467,11 @@ exports.schedule = function (optionsArg, callback, scope, args) {
  * Update notifications
  * @param {Object|Array} options The notifications to update
  * @param {Function} callback
- * @param {Object} scope The callback function's scope.
  * @param {Object} args Optional, can be {skipPermission: true} to skip the permission check
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.update = function (options, callback, scope, args) {
+exports.update = function (options, callback, errorCallback, args) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     const optionsList = exports._toArray(options);
 
     for (const options of optionsList) {
@@ -469,7 +483,7 @@ exports.update = function (options, callback, scope, args) {
 
     // Skip permission check if requested and update directly
     if (args && args.skipPermission) {
-        exports._exec('update', optionsList, callback, scope);
+        exports._exec('update', optionsList, callback, scope, errorCallback);
 
         // Ask for permission
     } else {
@@ -479,8 +493,8 @@ exports.update = function (options, callback, scope, args) {
                 return;
             }
     
-            exports._exec('update', optionsList, callback, scope);
-        }, this);
+            exports._exec('update', optionsList, callback, scope, errorCallback);
+        }, exports._callbackWithScope(errorCallback, scope));
     }
 };
 
@@ -488,70 +502,75 @@ exports.update = function (options, callback, scope, args) {
  * Clear one or multiple notifications by id/ids
  * @param {Array<number>|number} ids One Id or an array of Ids
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.clear = function (ids, callback, scope) {
-    exports._exec('clear', exports._convertIdsToNumbers(ids), callback, scope);
+exports.clear = function (ids, callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    exports._exec('clear', exports._convertIdsToNumbers(ids), callback, scope, errorCallback);
 };
 
 /**
  * Clear all triggered notifications.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.clearAll = function (callback, scope) {
-    exports._exec('clearAll', null, callback, scope);
+exports.clearAll = function (callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    exports._exec('clearAll', null, callback, scope, errorCallback);
 };
 
 /**
  * Clear one or multiple notifications by id/ids
  * @param {Array<number>|number} ids One Id or an array of Ids
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.cancel = function (ids, callback, scope) {
-    exports._exec('cancel', exports._convertIdsToNumbers(ids), callback, scope);
+exports.cancel = function (ids, callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    exports._exec('cancel', exports._convertIdsToNumbers(ids), callback, scope, errorCallback);
 };
 
 /**
  * Cancel all scheduled notifications.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.cancelAll = function (callback, scope) {
-    exports._exec('cancelAll', null, callback, scope);
+exports.cancelAll = function (callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    exports._exec('cancelAll', null, callback, scope, errorCallback);
 };
 
 /**
  * Check if a notification is present.
  * @param {number} id The ID of the notification.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.isPresent = function (id, callback, scope) {
+exports.isPresent = function (id, callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports.getType(id, function (type) {
         exports._callbackWithScope(callback, scope)(type != 'unknown');
-    });
+    }, errorCallback);
 };
 
 /**
  * Check if a notification is scheduled.
  * @param {Int} id The ID of the notification.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.isScheduled = function (id, callback, scope) {
-    exports.hasType(id, 'scheduled', callback, scope);
+exports.isScheduled = function (id, callback, errorCallback) {
+    exports.hasType(id, 'scheduled', callback, errorCallback);
 };
 
 /**
  * Check if a notification was triggered.
  * @param {Int} id The ID of the notification.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.isTriggered = function (id, callback, scope) {
-    exports.hasType(id, 'triggered', callback, scope);
+exports.isTriggered = function (id, callback, errorCallback) {
+    exports.hasType(id, 'triggered', callback, errorCallback);
 };
 
 /**
@@ -559,49 +578,54 @@ exports.isTriggered = function (id, callback, scope) {
  * @param {number} id The ID of the notification.
  * @param {string} type The type of the notification.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.hasType = function (id, type, callback, scope) {
+exports.hasType = function (id, type, callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports.getType(id, function (type2) {
         exports._callbackWithScope(callback, scope)(type == type2);
-    });
+    }, errorCallback);
 };
 
 /**
  * Get the type (triggered, scheduled) for the notification.
  * @param {number} id The ID of the notification.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.getType = function (id, callback, scope) {
-    exports._exec('type', id, callback, scope);
+exports.getType = function (id, callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    exports._exec('type', id, callback, scope, errorCallback);
 };
 
 /**
  * List of all notification ids.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.getIds = function (callback, scope) {
-    exports._exec('ids', 0, callback, scope);
+exports.getIds = function (callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    exports._exec('ids', 0, callback, scope, errorCallback);
 };
 
 /**
  * List of all scheduled notification IDs.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.getScheduledIds = function (callback, scope) {
-    exports._exec('ids', 1, callback, scope);
+exports.getScheduledIds = function (callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    exports._exec('ids', 1, callback, scope, errorCallback);
 };
 
 /**
  * List of all triggered notification IDs.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.getTriggeredIds = function (callback, scope) {
-    exports._exec('ids', 2, callback, scope);
+exports.getTriggeredIds = function (callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    exports._exec('ids', 2, callback, scope, errorCallback);
 };
 
 /**
@@ -610,9 +634,9 @@ exports.getTriggeredIds = function (callback, scope) {
  *
  * @param [ Array<Int> ] ids      The IDs of the notifications.
  * @param [ Function ]   callback The function to be exec as the callback.
- * @param [ Object ]     scope    The callback function's scope.
  *
  * @return [ Void ]
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.get = function () {
     var args = Array.apply(null, arguments);
@@ -621,46 +645,50 @@ exports.get = function () {
         args.unshift([]);
     }
 
-    var ids = args[0], callback = args[1], scope = args[2];
+    var ids = args[0], callback = args[1], errorCallback = args[2];
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
 
     if (!Array.isArray(ids)) {
-        this._exec('notification', Number(ids), callback, scope);
+        this._exec('notification', Number(ids), callback, scope, errorCallback);
         return;
     }
 
-    this._exec('notifications', [3, exports._convertIdsToNumbers(ids)], callback, scope);
+    this._exec('notifications', [3, exports._convertIdsToNumbers(ids)], callback, scope, errorCallback);
 };
 
 /**
  * List for all notifications.
  *
  * @param [ Function ] callback The function to be exec as the callback.
- * @param [ Object ]   scope    The callback function's scope.
  *
  * @return [ Void ]
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.getAll = function (callback, scope) {
-    this._exec('notifications', 0, callback, scope);
+exports.getAll = function (callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    this._exec('notifications', 0, callback, scope, errorCallback);
 };
 
 /**
  * List of all scheduled notifications.
  *
  * @param [ Function ]   callback The function to be exec as the callback.
- * @param [ Object ]     scope    The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.getScheduled = function (callback, scope) {
-    this._exec('notifications', 1, callback, scope);
+exports.getScheduled = function (callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    this._exec('notifications', 1, callback, scope, errorCallback);
 };
 
 /**
  * List of all triggered notifications.
  *
  * @param [ Function ]   callback The function to be exec as the callback.
- * @param [ Object ]     scope    The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.getTriggered = function (callback, scope) {
-    this._exec('notifications', 2, callback, scope);
+exports.getTriggered = function (callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    this._exec('notifications', 2, callback, scope, errorCallback);
 };
 
 /**
@@ -668,75 +696,83 @@ exports.getTriggered = function (callback, scope) {
  * @param {string} actionsGroupId
  * @param {Array} actions The actions to add for the groupId
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.addActions = function (actionsGroupId, actions, callback, scope) {
-    this._exec('actions', [0, actionsGroupId, actions], callback, scope);
+exports.addActions = function (actionsGroupId, actions, callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    this._exec('actions', [0, actionsGroupId, actions], callback, scope, errorCallback);
 };
 
 /**
  * Remove an actions group.
  * @param {string} actionsGroupId
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.removeActions = function (actionsGroupId, callback, scope) {
-    this._exec('actions', [1, actionsGroupId], callback, scope);
+exports.removeActions = function (actionsGroupId, callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    this._exec('actions', [1, actionsGroupId], callback, scope, errorCallback);
 };
 
 /**
  * Check if a group of actions is defined.
  * @param {string} actionsGroupId
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.hasActions = function (actionsGroupId, callback, scope) {
-    this._exec('actions', [2, actionsGroupId], callback, scope);
+exports.hasActions = function (actionsGroupId, callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    this._exec('actions', [2, actionsGroupId], callback, scope, errorCallback);
 };
 
 /**
  * Open native settings to enable notifications.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.openNotificationSettings = function (callback, scope) {
-    this._exec('openNotificationSettings', null, callback, scope);
+exports.openNotificationSettings = function (callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    this._exec('openNotificationSettings', null, callback, scope, errorCallback);
 };
 
 /**
  * Android only: Open native settings to enable alarms & reminders.
  * @param {Function} callback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.openAlarmSettings = function (callback, scope) {
-    this._exec('openAlarmSettings', null, callback, scope);
+exports.openAlarmSettings = function (callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    this._exec('openAlarmSettings', null, callback, scope, errorCallback);
 };
 
 /**
  * iOS only: Clear the badge of the app icon.
  * @param {Function} callback 
- * @param {Object} scope 
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.iOSClearBadge = function (callback, scope) {
-    this._exec('clearBadge', null, callback, scope);
+exports.iOSClearBadge = function (callback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    this._exec('clearBadge', null, callback, scope, errorCallback);
 }
 
 /**
  * Android only: Returns the status of Unused App Restrictions.
  * @param {Function} successCallback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.getUnusedAppRestrictionsStatus = function (successCallback, scope) {
-    exports._exec('getUnusedAppRestrictionsStatus', null, successCallback, scope);
+exports.getUnusedAppRestrictionsStatus = function (successCallback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    exports._exec('getUnusedAppRestrictionsStatus', null, successCallback, scope, errorCallback);
 }
 
 /**
  * Android only: Redirects the user to manage their unused app restriction settings.
  * @param {Function} successCallback The function to be exec as the callback.
- * @param {Object} scope The callback function's scope.
+ * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
-exports.openManageUnusedAppRestrictions = function (successCallback, scope) {
-    exports._exec('openManageUnusedAppRestrictions', null, successCallback, scope);
+exports.openManageUnusedAppRestrictions = function (successCallback, errorCallback) {
+    const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
+    exports._exec('openManageUnusedAppRestrictions', null, successCallback, scope, errorCallback);
 }
 
 /**
@@ -1140,11 +1176,14 @@ exports._convertIdsToNumbers = function (ids) {
  * @param [ Object ] scope     The scope for the function.
  *
  * @return [ Void ]
+ * @param {Function} errorCallback Receives native errors; omitted handlers log to the console.
  */
-exports._exec = function (action, options, callback, scope) {
+exports._exec = function (action, options, callback, scope, errorCallback) {
     exec(
         exports._callbackWithScope(callback, scope),
-        null,
+        exports._callbackWithScope(errorCallback, scope) || function (error) {
+            console.error('LocalNotification: ' + action + ' failed', error);
+        },
         'LocalNotification',
         action,
         // Convert options to array, if not already
