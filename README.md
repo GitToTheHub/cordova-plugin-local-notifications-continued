@@ -842,6 +842,7 @@ Note: This list has still to be documented.
 | clear                          | x       | x   | On Android, it clears a already posted notification from the statusbar. |
 | clearAll                       | x       | x   |                           |
 | [createChannel](#createchannel) | x       | -   | Creates a channel for Android to post notifications on. |
+| [getChannel](#getchannel) | x | - | Read current Android channel settings without creating or changing the channel. |
 | [deleteChannel](#deletechannel) | x       | -   | Delete a channel by an id. |
 | fireQueuedEvents               | x       | x   | Fire queued events once the device is ready and all listeners are registered. This is done automatically, when `deviceready` is fired. Calls the Plugin with a `ready` action. |
 | get                            |         |     |                           |
@@ -909,6 +910,54 @@ Property documentation:
 - [androidChannelEnableVibration](#property-androidchannelenablevibration)
 - [sound](#property-sound)
 - [androidChannelSoundUsage](#property-androidchannelsoundusage)
+
+### getChannel
+
+Android 8 and newer. Reads the current system settings of a notification channel, including changes made by the user. This method does not create, restore, or modify a channel.
+
+```js
+cordova.plugins.notification.local.getChannel('appointment_reminders', (channel) => {
+    if (channel === null) {
+        // The channel does not exist yet, was deleted, or channels are unsupported.
+        // schedule() can create it when needed. This does not mean permission was denied.
+        return;
+    }
+
+    if (!channel.appNotificationsEnabled) {
+        console.log('Notifications are disabled for the app.');
+    } else if (channel.blocked || channel.groupBlocked) {
+        console.log('This notification channel or its group is blocked.');
+    } else {
+        console.log('Channel importance:', channel.importance);
+        console.log('Configured sound:', channel.sound);
+    }
+});
+```
+
+Signature: `getChannel(channelId, callback, scope)`. `channelId` must be a non-empty string. The optional `scope` sets the callback's `this` context.
+
+The callback receives `null` when the channel does not exist (including a deleted channel), on Android 7, or on iOS. When channels are supported, a missing channel is different from an existing blocked channel. In particular, the default channel may not exist until a notification first creates it.
+
+For an existing channel, the callback receives:
+
+| Field | Type | Meaning |
+| :---- | :--- | :------ |
+| `id` | string | Channel ID. |
+| `name` | string | Current user-visible channel name. |
+| `description` | string or null | Channel description. |
+| `importance` | number | Current Android importance: `0` = none, `1` = minimum, `2` = low, `3` = default, `4` = high, `5` = maximum. |
+| `blocked` | boolean | `true` when the channel importance is `IMPORTANCE_NONE` (`0`). This field does not include app-level or group-level blocking. |
+| `appNotificationsEnabled` | boolean | Current app-level notification status, also checked by `hasPermission()`. |
+| `groupId` | string or null | Channel group ID, if assigned. |
+| `groupBlocked` | boolean | Whether the channel's group is blocked. Group blocking is available on Android 9 and newer; otherwise `false`. |
+| `sound` | string or null | Configured Android sound URI, or `null` if no sound is configured. This is a system URI, not the original plugin resource path. |
+| `vibration` | boolean | Whether vibration is enabled for the channel. |
+| `lights` | boolean | Whether notification lights are enabled for the channel. Device support varies. |
+| `showBadge` | boolean | Whether the channel allows notification badges. Launcher support varies. |
+
+These settings describe notification configuration, not a delivery guarantee. An unblocked channel may still be silent or delayed because of its importance, Do Not Disturb, device capabilities, or power-saving settings. Use [openNotificationSettings](#opennotificationsettings) to help the user review settings; the query does not bypass their choices.
+
+See [Android Channels](#android-channels), [NotificationChannel](https://developer.android.com/reference/android/app/NotificationChannel), and [NotificationManager.getNotificationChannel](https://developer.android.com/reference/android/app/NotificationManager#getNotificationChannel(java.lang.String)).
 
 ### deleteChannel
 <img src="images/android-icon.svg" width="16"> Android only

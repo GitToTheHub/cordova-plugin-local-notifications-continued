@@ -1,6 +1,9 @@
 {
   "name": "cordova-plugin-local-notifications-continued",
   "version": "1.2.4",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
   "description": "Schedules and queries for local notifications",
   "cordova": {
     "id": "cordova-plugin-local-notifications-continued",

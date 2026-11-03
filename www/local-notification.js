@@ -269,6 +269,26 @@ exports.createChannel = function (options, callback, scope) {
 };
 
 /**
+ * Read the current Android notification channel settings without creating it.
+ * @param {string} channelId The channel ID.
+ * @param {Function} callback Receives the channel settings or null if unavailable.
+ * @param {Object} scope The callback function's scope.
+ */
+exports.getChannel = function (channelId, callback, scope) {
+    if (typeof channelId !== 'string' || channelId.length === 0) {
+        throw new TypeError('channelId must be a non-empty string');
+    }
+
+    if (device.platform !== 'Android') {
+        const scopedCallback = exports._callbackWithScope(callback, scope);
+        if (scopedCallback) scopedCallback(null);
+        return;
+    }
+
+    exports._exec('getChannel', channelId, callback, scope);
+};
+
+/**
  * Android only: Deletes a notification channel.
  * If you create a new channel with this same id, the deleted channel will be un-deleted
  * with all of the same settings it had before it was deleted

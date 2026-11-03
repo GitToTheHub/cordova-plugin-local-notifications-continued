@@ -1,5 +1,11 @@
 # ChangeLog
 
+## Unreleased
+
+### Android
+
+- feat(android): add `getChannel(channelId, callback, scope)` to query current channel settings, app notification status, and channel/group blocking without creating the channel. Returns `null` for missing channels or unsupported platforms.
+
 ## Version 1.2.4
 
 ### Android
