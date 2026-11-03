@@ -648,7 +648,7 @@ public class Notification {
         // when using the setSmallIcon(int icon) method.
         builder.setSmallIcon(options.getSmallIcon());
 
-        Bitmap largeIcon = new AssetUtil(context).getBitmap(options.getAndroidLargeIcon());
+        Bitmap largeIcon = new AssetUtil(context).getIconBitmap(options.getAndroidLargeIcon());
         
         if (largeIcon != null) {
             if (options.getAndroidLargeIconType().equals(Options.LARGE_ICON_TYPE_CIRCLE)) {
