@@ -334,20 +334,8 @@ public final class AssetUtil {
         // Decoding at a reduced resolution requires usable image dimensions.
         if (metadata.outWidth <= 0 || metadata.outHeight <= 0) return null;
 
-        int ratio = calculateSizeRatio(
-            metadata.outWidth, metadata.outHeight, requestedWidth, requestedHeight);
-
-        // BitmapFactory.Options.inSampleSize reduces both dimensions during decoding:
-        // 4 means roughly 1/4 the width and height, requiring about 1/16 the pixel memory
-        // of the original image.
-        // A power of two is a value from the sequence 1, 2, 4, 8, 16, 32, ... (2 raised to an integer power).
-        // BitmapFactory decoders may round other sample sizes down to a power of two.
-        //
-        // Integer.highestOneBit explicitly selects the largest power of two not greater than the ratio.
-        // For example, ratio 6 becomes 4, retaining enough detail for display.
-        // A minimum of 1 keeps smaller images at their original size without upscaling.
         BitmapFactory.Options decodeOptions = new BitmapFactory.Options();
-        decodeOptions.inSampleSize = Integer.highestOneBit(Math.max(1, ratio));
+        decodeOptions.inSampleSize = calculateInSampleSize(metadata, requestedWidth, requestedHeight);
 
         // Open a fresh stream because the first pass consumed image data and content streams
         // do not necessarily support rewinding with reset(). This stream is also closed automatically.
@@ -358,21 +346,37 @@ public final class AssetUtil {
     }
 
     /**
-     * Calculate the smaller of the width and height ratios between an original and a target size.
-     * @param width Original width; must be non-negative and use the same unit as requestedWidth.
-     * @param height Original height; must be non-negative and use the same unit as requestedHeight.
-     * @param requestedWidth Target width; values below 1 are treated as 1.
-     * @param requestedHeight Target height; values below 1 are treated as 1.
-     * @return The smaller ratio, rounded down by integer division. Can be 0 if either original dimension is smaller.
+     * Calculate BitmapFactory.Options.inSampleSize using Google's Android sample:
+     * https://developer.android.com/topic/performance/graphics/load-bitmap#java
+     * The sample is adapted to treat target dimensions below 1 as 1.
+     * @param options Metadata containing the original image dimensions.
+     * @param reqWidth Target width in pixels.
+     * @param reqHeight Target height in pixels.
+     * @return A power-of-two reduction factor (1, 2, 4, 8, ...), or 1 to keep the original size.
      */
-    private static int calculateSizeRatio(int width, int height,
-            int requestedWidth, int requestedHeight) {
-        // The smaller ratio limits reduction so neither dimension falls below its target
-        // when the original is large enough. This retains resolution for cropping, as in:
-        // https://developer.android.com/topic/performance/graphics/load-bitmap#java
-        // Clamp target dimensions to at least 1 to prevent division by zero.
-        return Math.min(width / Math.max(1, requestedWidth),
-            height / Math.max(1, requestedHeight));
+    private static int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        // Raw height and width of image.
+        final int height = options.outHeight;
+        final int width = options.outWidth;
+        int inSampleSize = 1;
+
+        // Keep the existing protection against zero or negative target dimensions.
+        reqWidth = Math.max(1, reqWidth);
+        reqHeight = Math.max(1, reqHeight);
+
+        if (height > reqHeight || width > reqWidth) {
+            final int halfHeight = height / 2;
+            final int halfWidth = width / 2;
+
+            // Calculate the largest inSampleSize value that is a power of 2 and keeps both
+            // height and width at least as large as the requested height and width.
+            while ((halfHeight / inSampleSize) >= reqHeight
+                    && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2;
+            }
+        }
+
+        return inSampleSize;
     }
 
     /**
