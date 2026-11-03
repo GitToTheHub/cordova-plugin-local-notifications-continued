@@ -854,7 +854,7 @@ Note: This list has still to be documented.
 | getTriggeredIds                |         |     |                           |
 | getType                        |         |     |                           |
 | [getUnusedAppRestrictionsStatus](#getUnusedAppRestrictionsStatus) | x       | -   | Gets the status of the unused app restrictions status |
-| hasActions                     | x       | x   | Checks if an action group exists by id like `hasActions('YES_NO_CATEGORY', (hasActions) => {}, this)`                       |
+| hasActions                     | x       | x   | Checks if an action group exists by id like `hasActions('YES_NO_CATEGORY', (hasActions) => {})`                       |
 | [hasPermission](#hasPermission) | x       | x   | Checks if the app has permission to post notifications. |
 | [iOSClearBadge](#iosclearbadge) | -       | x   | Clears the badge          |
 | isPresent                      |         |     |                           |
@@ -864,7 +864,7 @@ Note: This list has still to be documented.
 | [openAlarmSettings](#openalarmsettings) | x       | -   | Supported since Android 12. Opens the "Alarms & Reminders"-settings, where the user can manually enable exact alarms. |
 | [openManageUnusedAppRestrictions](#openManageUnusedAppRestrictions) | x       | -   | Opens the unused app restriction settings directly in the app. |
 | [openNotificationSettings](#opennotificationsettings) | x       | (x) | Opens the notifications settings since Android 8. On iOS it opens the app settings. |
-| removeActions                  |  x      | x   | Removes actions by a group id like `removeActions('YES_NO_CATEGORY', () => {}, this)` which were previously created by `addActions` |
+| removeActions                  |  x      | x   | Removes actions by a group id like `removeActions('YES_NO_CATEGORY', () => {})` which were previously created by `addActions` |
 | [requestPermission](#requestpermission) | x       | x   | Request permission to post notifications. This is called automatically when scheduling notifications. |
 | schedule                       | x       | x    | Schedules a single notification or multiple notifications. Accepts an object or an Array. |
 | [setDefaults](#setdefaults)    | x       | x   | Overwrites default values of notifications. Gets the default for notification properties. |
@@ -899,7 +899,7 @@ cordova.plugins.notification.local.createChannel({
     androidChannelEnableVibration: true, // boolean (optional), default is false
     sound: 'www/audio/ring.mp3', // string (optional)
     androidChannelSoundUsage: 5 // int (optional), default is USAGE_NOTIFICATION
-  }, successCallback, this)
+}, successCallback);
 ```
 
 Property documentation:
@@ -918,7 +918,7 @@ Deletes a Android channel.
 Example:
 
 ```javascript
-cordova.plugins.notification.local.deleteChannel("my_channel_id", successCallback, this)
+cordova.plugins.notification.local.deleteChannel("my_channel_id", successCallback);
 ```
 
 These will delete all associated notificiations for this channel. If you create a new channel with the same id, the deleted channel will be un-deleted with all of the same settings it had before it was deleted, see [NotificationManagerCompat.deleteNotificationChannel](https://developer.android.com/reference/androidx/core/app/NotificationManagerCompat#deleteNotificationChannel(java.lang.String))
@@ -949,8 +949,7 @@ cordova.plugins.notification.local.getUnusedAppRestrictionsStatus(
         if (status == statusCodes.API_31) {
 
         }
-    },
-    this
+    }
 );
 ```
 
@@ -998,7 +997,7 @@ Sample:
 ```javascript
 cordova.plugins.notification.local.openManageUnusedAppRestrictions((result) => {
     // User has returned from the settings
-}, this);
+});
 ```
 
 You can check in the `successCallback` what the user selected, by calling [getUnusedAppRestrictionsStatus](#getunusedapprestrictionsstatus).
