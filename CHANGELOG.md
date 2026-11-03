@@ -19,6 +19,8 @@
 
 **Others:**
 
+- refactor(android): separate channel operations and rename the notification request model to avoid confusion with Android framework classes ([#15](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/15)).
+
 - chore: prepare version 1.2.5-dev and group pending fixes ([#11](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/11))
 - docs: remove unnecessary callback scope from examples ([#9](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/9))
 - docs: consolidate notification image fixes in changelog ([#16](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/16))

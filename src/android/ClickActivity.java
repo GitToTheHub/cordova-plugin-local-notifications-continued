@@ -27,7 +27,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 
-import de.appplant.cordova.plugin.localnotification.Notification;
+import de.appplant.cordova.plugin.localnotification.LocalNotificationRequest;
 import de.appplant.cordova.plugin.localnotification.action.Action;
 
 /**
@@ -47,10 +47,10 @@ public class ClickActivity extends Activity {
         Intent intent = getIntent();
         Log.d(TAG, "Notification clicked, extras=" + intent.getExtras());
 
-        int notificationId = intent.getIntExtra(Notification.EXTRA_ID, -1);
+        int notificationId = intent.getIntExtra(LocalNotificationRequest.EXTRA_ID, -1);
         // Get the clicked action id, if an action was clicked, otherwise it is null
         String actionId = intent.getStringExtra(Action.EXTRA_ID);
-        Notification notification = Notification.getFromSharedPreferences(getApplicationContext(), notificationId);
+        LocalNotificationRequest notification = LocalNotificationRequest.getFromSharedPreferences(getApplicationContext(), notificationId);
 
         // Check if the notification data is available
         // Normally it should be available, but in some cases it isn't

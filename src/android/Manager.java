@@ -26,13 +26,11 @@ package de.appplant.cordova.plugin.localnotification;
 
 import android.annotation.SuppressLint;
 import android.app.AlarmManager;
-import android.app.NotificationChannel;
 import androidx.core.app.NotificationManagerCompat;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.service.notification.StatusBarNotification;
-import android.media.AudioAttributes;
 import android.net.Uri;
 import android.util.Log;
 import android.os.PowerManager;
@@ -47,10 +45,8 @@ import java.util.Random;
 import java.util.Set;
 
 import static android.os.Build.VERSION.SDK_INT;
-import static android.os.Build.VERSION_CODES.O;
-import static android.os.Build.VERSION_CODES.P;
 import static android.os.Build.VERSION_CODES.S;
-import static de.appplant.cordova.plugin.localnotification.Notification.Type.TRIGGERED;
+import static de.appplant.cordova.plugin.localnotification.LocalNotificationRequest.Type.TRIGGERED;
 import de.appplant.cordova.plugin.localnotification.util.AssetUtil;
 
 /**
@@ -82,96 +78,13 @@ public final class Manager {
         return alarmManager.canScheduleExactAlarms();
     }
 
-    public static NotificationChannel getChannel(Context context, Options options) {
-        // Channels are only supported since Android 8
-        if (SDK_INT < O) return null;
-        return NotificationManagerCompat.from(context).getNotificationChannel(options.getAndroidChannelId());
-    }
-
-    /**
-     * Create Notification channel with options
-     * @param options Set of channel options.
-     * 
-     */
-    public static void createChannel(Context context, Options options) {
-        // Channels are only supported since Android 8
-        if (SDK_INT < O) return;
-
-        // Check if channel exists
-        NotificationChannel channel = getChannel(context, options);
-        
-        String groupId = options.getAndroidChannelGroupId();
-        NotificationManagerCompat manager = NotificationManagerCompat.from(context);
-        if (groupId != null && manager.getNotificationChannelGroup(groupId) == null) {
-            throw new IllegalArgumentException("Create the channel group before using it: " + groupId);
-        }
-
-        // Android permits assigning a previously ungrouped channel, but not moving it.
-        if (channel != null) {
-            if (channel.getGroup() == null && groupId != null) {
-                channel.setGroup(groupId);
-                manager.createNotificationChannel(channel);
-            }
-            return;
-        }
-
-        Log.d(TAG, "Create channel" + 
-            ", id=" + options.getAndroidChannelId() +
-            ", name=" + options.getAndroidChannelName() +
-            ", options=" + options);
-
-        // Create new channel
-        channel = new NotificationChannel(
-            options.getAndroidChannelId(),
-            options.getAndroidChannelName(), options.getAndroidChannelImportance());
-
-        channel.setGroup(groupId);
-        channel.setDescription(options.getAndroidChannelDescription());
-        channel.enableVibration(options.isAndroidChannelEnableVibration());
-        channel.enableLights(options.getAndroidChannelEnableLights());
-
-        Uri soundUri = options.getSoundUri();
-        Log.d(TAG, "sound uri: " + soundUri);
-
-        // Grant permission to the system to play the sound, needed only in Android 8
-        if (soundUri != Uri.EMPTY && SDK_INT < P) {
-            grantUriPermission(context, soundUri);
-        }
-        
-        // If options.getSoundUri() is Uri.EMPTY, an empty sound will be set, which means no sound
-        channel.setSound(soundUri, new AudioAttributes.Builder().setUsage(options.getSoundUsage()).build());
-
-        NotificationManagerCompat.from(context).createNotificationChannel(channel);
-    }
-
-    /**
-     * Deletes a notification channel by an id. If you create a new channel with this same id,
-     * the deleted channel will be un-deleted with all of the same settings it had before it was deleted.
-     * @param channelId Like "my_channel_01"
-     */
-    public void deleteChannel(String channelId) {
-        // Channels are supported since Android 8
-        if (SDK_INT < O) return;
-
-        Log.d(TAG, "Delete channel, id=" + channelId);
-
-        // Cancel all notifications regarding this channel
-        for (Notification notification : new Manager(context).getNotificationsFromSharedPreferences()) {
-            if (notification.getOptions().getAndroidChannelId().equals(channelId)) {
-                notification.cancel();
-            }
-        }
-
-        NotificationManagerCompat.from(context).deleteNotificationChannel(channelId);
-    }
-
     /**
      * Update local notification specified by ID.
      * @param notificationId The ID of the notification.
      * @param updates JSON object with notification options.
      */
-    public Notification update(int notificationId, JSONObject updates) {
-        Notification notification = Notification.getFromSharedPreferences(context, notificationId);
+    public LocalNotificationRequest update(int notificationId, JSONObject updates) {
+        LocalNotificationRequest notification = LocalNotificationRequest.getFromSharedPreferences(context, notificationId);
         if (notification == null) return null;
 
         notification.update(updates);
@@ -183,7 +96,7 @@ public final class Manager {
      * Clear all local notifications.
      */
     public void clearAll() {
-        for (Notification notification : getByType(TRIGGERED)) {
+        for (LocalNotificationRequest notification : getByType(TRIGGERED)) {
             notification.clear();
         }
 
@@ -194,7 +107,7 @@ public final class Manager {
      * Cancel all local notifications.
      */
     public void cancelAll() {
-        for (Notification notification : getNotificationsFromSharedPreferences()) {
+        for (LocalNotificationRequest notification : getNotificationsFromSharedPreferences()) {
             notification.cancel();
         }
 
@@ -226,9 +139,9 @@ public final class Manager {
      * Get saved notification ids for a given type.
      * @param type The notification life cycle type
      */
-    public List<Integer> getNotificationIdsByType(Notification.Type type) {
+    public List<Integer> getNotificationIdsByType(LocalNotificationRequest.Type type) {
         // Returns triggered and scheduled notifications
-        if (type == Notification.Type.ALL) return getNotificationIds();
+        if (type == LocalNotificationRequest.Type.ALL) return getNotificationIds();
 
         List<Integer> activeIds = new ArrayList<Integer>();
 
@@ -249,18 +162,18 @@ public final class Manager {
     /**
      * List of all local notification.
      */
-    public List<Notification> getNotificationsFromSharedPreferences() {
+    public List<LocalNotificationRequest> getNotificationsFromSharedPreferences() {
         return getNotificationsFromSharedPreferences(getNotificationIds());
     }
 
     /**
      * List of local notifications with matching ID.
      */
-    public List<Notification> getNotificationsFromSharedPreferences(List<Integer> notificationIds) {
-        List<Notification> notifications = new ArrayList<Notification>();
+    public List<LocalNotificationRequest> getNotificationsFromSharedPreferences(List<Integer> notificationIds) {
+        List<LocalNotificationRequest> notifications = new ArrayList<LocalNotificationRequest>();
 
         for (int notificationId : notificationIds) {
-            Notification notification = Notification.getFromSharedPreferences(context, notificationId);
+            LocalNotificationRequest notification = LocalNotificationRequest.getFromSharedPreferences(context, notificationId);
             if (notification != null) notifications.add(notification);
         }
 
@@ -272,8 +185,8 @@ public final class Manager {
      *
      * @param type The notification life cycle type
      */
-    public List<Notification> getByType(Notification.Type type) {
-        return type == Notification.Type.ALL ? getNotificationsFromSharedPreferences() : getNotificationsFromSharedPreferences(getNotificationIdsByType(type));
+    public List<LocalNotificationRequest> getByType(LocalNotificationRequest.Type type) {
+        return type == LocalNotificationRequest.Type.ALL ? getNotificationsFromSharedPreferences() : getNotificationsFromSharedPreferences(getNotificationIdsByType(type));
     }
 
     /**
