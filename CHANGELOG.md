@@ -10,6 +10,8 @@
 
 **Fixes:**
 
+- fix: report native failures through optional error callbacks while preserving legacy callback scope objects.
+
 - fix(android): reduce notification image memory usage while preserving crop quality ([#6](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/6), [#7](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/7), [#8](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/8))
 
 **Others:**

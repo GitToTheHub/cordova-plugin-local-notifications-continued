@@ -63,7 +63,13 @@ public class RestoreReceiver extends BroadcastReceiver {
             Log.d(TAG, "Restoring notifications, count: " + notifications.size());
 
             for (Notification notification : notifications) {
-                notification.schedule();
+                try {
+                    notification.schedule();
+                } catch (Exception e) {
+                    Log.e(TAG, "Could not restore notification, notificationId=" + notification.getId()
+                    + ", channelId=" + notification.getOptions().getAndroidChannelId()
+                    + ", groupId=" + notification.getOptions().getAndroidChannelGroupId(), e);
+                }
             }
         }
     }
