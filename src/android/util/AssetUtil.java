@@ -282,8 +282,9 @@ public final class AssetUtil {
     public Bitmap getBitmap(String resourcePath) {
         // Use the display dimensions in pixels to choose a suitable decoding resolution.
         // Smaller images are not upscaled.
-        // Note: Power-of-two subsampling intentionally retains enough resolution for display,
-        // so a decoded dimension can be up to almost twice its target size.
+        // Note: Power-of-two subsampling retains enough resolution in both dimensions
+        // for display and cropping. Images with a different aspect ratio can remain larger
+        // than the target in one dimension.
         return getBitmap(resourcePath,
             context.getResources().getDisplayMetrics().widthPixels,
             context.getResources().getDisplayMetrics().heightPixels);
@@ -357,18 +358,20 @@ public final class AssetUtil {
     }
 
     /**
-     * Calculate the larger of the width and height ratios between an original and a target size.
+     * Calculate the smaller of the width and height ratios between an original and a target size.
      * @param width Original width; must be non-negative and use the same unit as requestedWidth.
      * @param height Original height; must be non-negative and use the same unit as requestedHeight.
      * @param requestedWidth Target width; values below 1 are treated as 1.
      * @param requestedHeight Target height; values below 1 are treated as 1.
-     * @return The larger ratio, rounded down by integer division. Can be 0 for smaller originals.
+     * @return The smaller ratio, rounded down by integer division. Can be 0 if either original dimension is smaller.
      */
     private static int calculateSizeRatio(int width, int height,
             int requestedWidth, int requestedHeight) {
-        // Compare both dimensions so very wide or tall originals are also taken into account.
+        // The smaller ratio limits reduction so neither dimension falls below its target
+        // when the original is large enough. This retains resolution for cropping, as in:
+        // https://developer.android.com/topic/performance/graphics/load-bitmap#java
         // Clamp target dimensions to at least 1 to prevent division by zero.
-        return Math.max(width / Math.max(1, requestedWidth),
+        return Math.min(width / Math.max(1, requestedWidth),
             height / Math.max(1, requestedHeight));
     }
 
