@@ -4,6 +4,8 @@
 
 ### Android
 
+- fix(android): preserve bitmap resolution for cropping ([#7](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/7))
+  - Follow up to #6: use Google's sample-size calculation to retain sufficient resolution in both dimensions when the original image is large enough, preserving detail when notification icons are cropped.
 - fix(android): downsample notification images during decoding ([#6](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/6))
   - File-based notification images were decoded at full resolution, potentially using excessive memory and causing a Play Console performance warning. Images are now downsampled during decoding using notification icon dimensions for large icons and person icons, and screen dimensions for picture attachments. Image streams are closed after decoding.
   - Fixes [Issue #2103](https://github.com/katzer/cordova-plugin-local-notifications/issues/2103).
