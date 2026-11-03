@@ -4,6 +4,8 @@
 
 ### Android
 
+- refactor(android): use Google's bitmap sample-size helper ([#8](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/8))
+  - Replace the separate size-ratio calculation with `calculateInSampleSize` from the Android documentation, retaining the protection against target dimensions below 1 and separate metadata and decoding options. Sampling behavior is unchanged.
 - fix(android): preserve bitmap resolution for cropping ([#7](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/7))
   - Follow up to #6: use Google's sample-size calculation to retain sufficient resolution in both dimensions when the original image is large enough, preserving detail when notification icons are cropped.
 - fix(android): downsample notification images during decoding ([#6](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/6))
