@@ -27,6 +27,9 @@ package de.appplant.cordova.plugin.localnotification;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.KeyguardManager;
+import android.app.NotificationChannel;
+import android.app.NotificationChannelGroup;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.util.Pair;
 import android.view.View;
@@ -159,6 +162,8 @@ public class LocalNotification extends CordovaPlugin {
                     deviceready();
                 } else if (action.equals("createChannel")) {
                     createChannel(args, callbackContext);
+                } else if (action.equals("getChannel")) {
+                    getChannel(args, callbackContext);
                 } else if (action.equals("deleteChannel")) {
                     deleteChannel(args, callbackContext);
                 } else if (action.equals("hasPermission")) {
@@ -342,6 +347,49 @@ public class LocalNotification extends CordovaPlugin {
     private void createChannel(JSONArray args, CallbackContext callbackContext) {
         Manager.createChannel(getContext(), new Options(getContext(), args.optJSONObject(0)));
         callbackContext.success();
+    }
+
+    /**
+     * Read a channel's current system settings without creating or changing it.
+     */
+    private void getChannel(JSONArray args, CallbackContext callbackContext) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, (String) null));
+            return;
+        }
+
+        NotificationManagerCompat manager = NotificationManagerCompat.from(getContext());
+        NotificationChannel channel = manager.getNotificationChannel(args.optString(0));
+        if (channel == null) {
+            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, (String) null));
+            return;
+        }
+
+        boolean groupBlocked = false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && channel.getGroup() != null) {
+            NotificationChannelGroup group = manager.getNotificationChannelGroup(channel.getGroup());
+            groupBlocked = group != null && group.isBlocked();
+        }
+
+        try {
+            JSONObject result = new JSONObject();
+            result.put("id", channel.getId());
+            result.put("name", channel.getName().toString());
+            result.put("description", channel.getDescription() == null ? JSONObject.NULL : channel.getDescription());
+            result.put("importance", channel.getImportance());
+            result.put("blocked", channel.getImportance() == NotificationManager.IMPORTANCE_NONE);
+            result.put("appNotificationsEnabled", manager.areNotificationsEnabled());
+            result.put("groupId", channel.getGroup() == null ? JSONObject.NULL : channel.getGroup());
+            result.put("groupBlocked", groupBlocked);
+            Uri sound = channel.getSound();
+            result.put("sound", sound == null || Uri.EMPTY.equals(sound) ? JSONObject.NULL : sound.toString());
+            result.put("vibration", channel.shouldVibrate());
+            result.put("lights", channel.shouldShowLights());
+            result.put("showBadge", channel.canShowBadge());
+            callbackContext.success(result);
+        } catch (JSONException e) {
+            callbackContext.error("Could not read notification channel: " + e.getMessage());
+        }
     }
 
     /**
