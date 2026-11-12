@@ -788,31 +788,25 @@ if (cordova.platformId === 'android') {
             return;
         }
 
-        notifications.createChannel({
+        notifications.schedule({
+            id: 70,
+            title: 'Appointment reminder',
+            text: 'Your appointment starts soon.',
             androidChannelId: 'reminders_custom_sound',
             androidChannelName: 'Reminders',
             androidChannelDescription: 'Appointment reminders with a custom sound',
-            androidChannelImportance: 'IMPORTANCE_DEFAULT',
-            sound: 'www/audio/reminder.mp3'
-        }, () => {
-            notifications.schedule({
-                id: 70,
-                title: 'Appointment reminder',
-                text: 'Your appointment starts soon.',
-                androidChannelId: 'reminders_custom_sound',
-                sound: 'www/audio/reminder.mp3',
-                trigger: { in: 10, unit: 'second' }
-            });
+            sound: 'www/audio/reminder.mp3',
+            trigger: { in: 10, unit: 'second' }
         });
     });
 }
 ```
 
-On Android 8 and newer, the sound is set when the channel is first created. The callback ensures channel creation finishes before scheduling. Each notification selects that channel using the same [`androidChannelId`](#property-androidchannelid). The [`sound`](#property-sound) on the notification also supports Android 7, which has no channels.
+On Android 8 and newer, [`schedule()`](#schedule) creates the channel automatically if needed and sets its sound. The default importance is [`IMPORTANCE_DEFAULT`](#property-androidchannelimportance), so it does not need to be specified. Each notification selects that channel using the same [`androidChannelId`](#property-androidchannelid). The [`sound`](#property-sound) on the notification also supports Android 7, which has no channels.
 
-If you already created this channel ID with another sound (or without sound), changing the code will not replace its sound. During development, test with a new channel ID. In a released app, respect the user's channel settings; users can change the sound or disable the channel in Android settings. App notification permission alone does not guarantee that the channel is audible: channel settings, silent mode, volume, and Do Not Disturb can affect it.
+If you already created this channel ID with another sound (or without sound), changing the code will not replace its sound. Deleting the channel and recreating it with the same ID also restores its previous settings; see [Android: deleteNotificationChannel](https://developer.android.com/reference/android/app/NotificationManager#deleteNotificationChannel(java.lang.String)). During development, test with a new channel ID. In a released app, respect the user's channel settings; users can change the sound or disable the channel in Android settings. App notification permission alone does not guarantee that the channel is audible: channel settings, silent mode, volume, and Do Not Disturb can affect it.
 
-You can also pass the channel properties and sound directly to [`schedule()`](#schedule), which creates a missing channel automatically. Separate [`createChannel()`](#createchannel) calls are useful when preparing categories before posting notifications. See [sound](#property-sound) for other supported sound sources.
+Separate [`createChannel()`](#createchannel) calls are useful when preparing categories before posting notifications. See [sound](#property-sound) for other supported sound sources.
 
 ### Channel Groups
 
