@@ -27,11 +27,22 @@ import android.app.AlarmManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.util.Log;
 
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import androidx.core.app.NotificationManagerCompat;
+import org.json.JSONObject;
 
 import de.appplant.cordova.plugin.localnotification.Manager;
+import de.appplant.cordova.plugin.localnotification.LocalNotificationChannels;
 import de.appplant.cordova.plugin.localnotification.LocalNotificationRequest;
 
 /**
@@ -43,33 +54,84 @@ public class RestoreReceiver extends BroadcastReceiver {
 
     public static final String TAG = "RestoreReceiver";
 
-    /**
-     * Called when alarms and notifications need to be restored.
-     * @param context Application context
-     * @param intent Received intent with content data
-     */
+    // Serialize restoration broadcasts so they cannot restore the same snapshot concurrently.
+    private static final ExecutorService RESTORE_EXECUTOR = Executors.newSingleThreadExecutor();
+
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.d(TAG, "Received action: " + intent.getAction());
+        String action = intent == null ? null : intent.getAction();
+        if (!Intent.ACTION_BOOT_COMPLETED.equals(action)
+                && !Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)
+                && !AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED.equals(action)) {
+            return;
+        }
 
-        // The device was booted and is unlocked
-        if (intent.getAction().equals(Intent.ACTION_BOOT_COMPLETED) ||
-            // The app was updated
-            intent.getAction().equals(Intent.ACTION_MY_PACKAGE_REPLACED) ||
-            // The app is granted the SCHEDULE_EXACT_ALARM permission
-            intent.getAction().equals(AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED)) {
+        Log.d(TAG, "Received action: " + action);
+        PendingResult pendingResult = goAsync();
+        Context appContext = context.getApplicationContext();
+        RESTORE_EXECUTOR.execute(() -> {
+            try {
+                restore(appContext);
+            } finally {
+                pendingResult.finish();
+            }
+        });
+    }
 
-            List<LocalNotificationRequest> notifications = new Manager(context).getNotificationsFromSharedPreferences();
-            Log.d(TAG, "Restoring notifications, count: " + notifications.size());
+    private void restore(Context context) {
+        List<LocalNotificationRequest> notifications = new Manager(context).getNotificationsFromSharedPreferences();
+        Log.d(TAG, "Restoring notifications, count: " + notifications.size());
+        LocalNotificationChannels channels = new LocalNotificationChannels(context);
+        boolean appEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled();
+        Map<String, Boolean> channelEnabled = new HashMap<>();
+        SharedPreferences.Editor editor = Manager.getSharedPreferences(context).edit();
+        List<LocalNotificationRequest> remaining = new ArrayList<>();
+        Date now = new Date();
+        int removed = 0;
 
-            for (LocalNotificationRequest notification : notifications) {
-                try {
-                    notification.schedule();
-                } catch (Exception e) {
-                    Log.e(TAG, "Could not restore notification, notificationId=" + notification.getId()
+        for (LocalNotificationRequest notification : notifications) {
+            try {
+                Date due = notification.getTriggerHandler().getTriggerDate();
+                if (due != null && !due.after(now) && notification.getTriggerHandler().isLastOccurrence()) {
+                    String channelId = notification.getOptions().getAndroidChannelId();
+                    boolean enabled = appEnabled;
+                    if (enabled) {
+                        Boolean cached = channelEnabled.get(channelId);
+                        if (cached == null) {
+                            JSONObject channel = channels.get(channelId);
+                            // Missing channels can be recreated; Android 7 has no channels.
+                            cached = channel == null || channel.getBoolean("enabled");
+                            channelEnabled.put(channelId, cached);
+                        }
+                        enabled = cached;
+                    }
+                    if (!enabled) {
+                        editor.remove(notification.getSharedPreferencesKeyOptions())
+                            .remove(notification.getSharedPreferencesKeyOccurrence())
+                            .remove(notification.getSharedPreferencesKeyTriggerBaseDate())
+                            .remove(notification.getSharedPreferencesKeyTriggerDate());
+                        removed++;
+                        continue;
+                    }
+                }
+            } catch (Exception e) {
+                // If settings cannot be read, preserve the request rather than deleting it.
+                Log.e(TAG, "Could not inspect restored notification, notificationId=" + notification.getId(), e);
+            }
+            remaining.add(notification);
+        }
+
+        // Shrink the map before schedule() writes any remaining requests back to it.
+        if (removed > 0) editor.apply();
+        Log.d(TAG, "Removed expired blocked notifications, count: " + removed);
+
+        for (LocalNotificationRequest notification : remaining) {
+            try {
+                notification.schedule();
+            } catch (Exception e) {
+                Log.e(TAG, "Could not restore notification, notificationId=" + notification.getId()
                     + ", channelId=" + notification.getOptions().getAndroidChannelId()
                     + ", groupId=" + notification.getOptions().getAndroidChannelGroupId(), e);
-                }
             }
         }
     }
