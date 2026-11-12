@@ -171,9 +171,14 @@ public class Notification {
      * when the notification is scheduled for the first time, so the first occurrence
      * can be calculated.
      * @return true if the notification was scheduled, false otherwise, which can happen,
-     * if the notification was triggered directly, an error occured or there is no next trigger date.
+     * if the notification was triggered directly or there is no next trigger date.
+     * @throws IllegalArgumentException if channel/group settings or alarm parameters are invalid;
+     *         also when the referenced channel group does not exist.
+     * @throws IllegalStateException if Android's channel count limit is reached or scheduling
+     *         exceeds the alarm limit (commonly 500 alarms per app; the device may use a different limit).
+     * @throws SecurityException if Android denies alarm scheduling or access to a sound URI.
      */
-    public boolean scheduleNext() {
+    public boolean scheduleNext() throws IllegalArgumentException, IllegalStateException, SecurityException {
         Date triggerDate = triggerhandler.getNextTriggerDate();
 
         // No next trigger date available, all triggers are done
@@ -197,9 +202,21 @@ public class Notification {
      * Schedules the notification with the current state of the dateTrigger.
      * If the triggerDate is in the past, the notification will be triggered directly.
      * @return true if the notification was scheduled, false otherwise, which can happen,
-     * if the notification was triggered directly or an error occured.
+     * if the notification was triggered directly or there is no trigger date.
+     *
+     * Channel creation and AlarmManager failures propagate to the caller, which logs and
+     * handles them. A blocked channel or denied notification permission is a normal
+     * system setting, not a scheduling exception. Work completed before an exception
+     * (such as storing notification data) is not rolled back.
+     *
+     * @throws IllegalArgumentException if channel settings are invalid, the referenced
+     *         channel group does not exist, or an alarm parameter such as its type is invalid.
+     * @throws IllegalStateException if Android's channel count limit is reached or scheduling
+     *         exceeds the alarm limit (commonly 500 alarms per app; the device may use a different limit).
+     * @throws SecurityException if Android denies alarm scheduling (for example, exact-alarm
+     *         permission was revoked) or access to the configured sound URI.
      */
-    public boolean schedule() {
+    public boolean schedule() throws IllegalArgumentException, IllegalStateException, SecurityException {
         Date triggerDate = triggerhandler.getTriggerDate();
 
         if (triggerDate == null) {
@@ -207,13 +224,8 @@ public class Notification {
             return false;
         }
 
-        // A group may have been deleted since this notification was scheduled.
-        try {
-            Manager.createChannel(context, options);
-        } catch (IllegalArgumentException e) {
-            Log.e(TAG, "Could not create notification channel", e);
-            return false;
-        }
+        // Create the channel if it does not exist.
+        Manager.createChannel(context, options);
 
         // Store notification data for restoration
         // Needed for ClickActivity and ClearReceiver
@@ -247,37 +259,32 @@ public class Notification {
         // that previous alarm will first be canceled.
         PendingIntent alarmFiresPendingIntent = PendingIntent.getBroadcast(context, 0, alarmFiresIntent, PendingIntent.FLAG_IMMUTABLE);
 
-        // A maximum of 500 alarms can be scheduled, catch exception
-        try {
-            // Execute alarm even when the system is in low-power idle (a.k.a. doze) modes.
-            if (options.isAndroidAllowWhileIdle()) {
-                if (canScheduleExactAlarms) {
-                    getAlarmManager().setExactAndAllowWhileIdle(
-                        options.getAndroidAlarmType(), triggerDate.getTime(), alarmFiresPendingIntent);
-                } else {
-                    getAlarmManager().setAndAllowWhileIdle(
-                        options.getAndroidAlarmType(), triggerDate.getTime(), alarmFiresPendingIntent);
-                }
-
-                // Execute alarm by RTC or RTC_WAKEUP
+        // A maximum of 500 alarms per app is commonly enforced by Android; the device
+        // may use a different limit. Exceeding it throws IllegalStateException.
+        // AlarmManager can also reject invalid parameters or denied permissions.
+        // Let the caller log and handle these failures.
+        // Execute alarm even when the system is in low-power idle (a.k.a. doze) modes.
+        if (options.isAndroidAllowWhileIdle()) {
+            if (canScheduleExactAlarms) {
+                getAlarmManager().setExactAndAllowWhileIdle(
+                    options.getAndroidAlarmType(), triggerDate.getTime(), alarmFiresPendingIntent);
             } else {
-                if (canScheduleExactAlarms) {
-                    getAlarmManager().setExact(
-                        options.getAndroidAlarmType(), triggerDate.getTime(), alarmFiresPendingIntent);
-                } else {
-                    getAlarmManager().set(
-                        options.getAndroidAlarmType(), triggerDate.getTime(), alarmFiresPendingIntent);
-                }
+                getAlarmManager().setAndAllowWhileIdle(
+                    options.getAndroidAlarmType(), triggerDate.getTime(), alarmFiresPendingIntent);
             }
 
-            return true;
-
-            // Maximum 500 alarms can be scheduled.
-            // If more are scheduled, an exception will be thrown.
-        } catch (Exception exception) {
-            Log.d(TAG, "Exception occurred during scheduling notification", exception);
-            return false;
+            // Execute alarm by RTC or RTC_WAKEUP
+        } else {
+            if (canScheduleExactAlarms) {
+                getAlarmManager().setExact(
+                    options.getAndroidAlarmType(), triggerDate.getTime(), alarmFiresPendingIntent);
+            } else {
+                getAlarmManager().set(
+                    options.getAndroidAlarmType(), triggerDate.getTime(), alarmFiresPendingIntent);
+            }
         }
+
+        return true;
     }
 
     /**

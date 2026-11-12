@@ -65,6 +65,12 @@ public class TriggerReceiver extends BroadcastReceiver {
         // and ClearReceiver can still read the notification data. They
         // will remove the notification from the SharedPreferences if they are
         // executed. A notification can ony be cleared or clicked.
-        notification.scheduleNext();
+        try {
+            notification.scheduleNext();
+        } catch (Exception e) {
+            Log.e(TAG, "Could not schedule next notification, notificationId=" + notification.getId()
+                    + ", channelId=" + notification.getOptions().getAndroidChannelId()
+                    + ", groupId=" + notification.getOptions().getAndroidChannelGroupId(), e);
+        }
     }
 }
