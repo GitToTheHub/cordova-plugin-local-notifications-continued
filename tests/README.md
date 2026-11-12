@@ -19,3 +19,11 @@ Load `android/channel-groups.js` in the disposable Cordova app instead of `andro
 ## Native Error Callback Integration Test
 
 Load `android/error-callback.js` in the disposable Cordova app with notification permission granted. It deliberately references a missing group to verify the error callback for channel creation and scheduling (with and without the automatic permission check), the success/error callback argument order, and absence of failed notification/channel side effects. It also checks that an invalid alarm type reaches the error callback. Success logs `ERROR_CALLBACK_NATIVE_ALL_PASS`. It also invokes an operation without an error handler; verify the JavaScript console reports `LocalNotification: createChannel failed` and the app stays running.
+
+## Existing Application Compatibility Check
+
+The error-callback change was checked against the unchanged `NotificationPluginPromises` wrappers in the local Abfuhrkalender app. Android and iOS JavaScript bridge calls match plugin 1.2.3 except for plugin/version metadata. Legacy object scopes and denied-permission results remain supported.
+
+A disposable copy of the app builds for Android with only its plugin dependency replaced. On an Android 16 emulator, the app initializes, its original permission and scheduling Promise wrappers resolve, the scheduled notification can be queried and canceled, and a missing channel group reaches the new native error callback.
+
+This does not cover every app workflow or an iOS device run. A Promise wrapper that only supplies a success callback remains pending after a native error; the plugin logs the error but cannot reject a Promise it does not own.
