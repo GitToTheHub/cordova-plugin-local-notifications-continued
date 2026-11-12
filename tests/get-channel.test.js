@@ -112,11 +112,11 @@ test('validates group IDs, names, and descriptions before invoking native code',
     const { plugin, calls } = loadPlugin('Android');
     for (const options of [null, {}, { id: '', name: 'Group' }, { id: 'g', name: '' },
         { id: 1, name: 'Group' }, { id: 'g', name: 'Group', description: 1 }]) {
-        assert.throws(() => plugin.createChannelGroup(options), { name: 'TypeError' });
+        assert.throws(() => plugin.createChannelGroup(options, () => {}), { name: 'TypeError' });
     }
     for (const id of [undefined, null, '', 1]) {
-        assert.throws(() => plugin.getChannelGroup(id), { name: 'TypeError' });
-        assert.throws(() => plugin.deleteChannelGroup(id), { name: 'TypeError' });
+        assert.throws(() => plugin.getChannelGroup(id, () => {}), { name: 'TypeError' });
+        assert.throws(() => plugin.deleteChannelGroup(id, () => {}), { name: 'TypeError' });
     }
     assert.deepEqual(calls, []);
 });

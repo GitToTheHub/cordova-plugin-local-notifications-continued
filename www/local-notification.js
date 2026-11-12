@@ -257,6 +257,16 @@ exports.getDefaults = function () {
     return this._defaults;
 };
 
+/** Run the callback API as a Promise, preserving platform fallbacks and validation. */
+exports._promise = function (method, parameters, callbackIndex) {
+    const args = Array.prototype.slice.call(parameters);
+    return new Promise((resolve, reject) => {
+        args[callbackIndex] = resolve;
+        args[callbackIndex + 1] = reject;
+        exports[method].apply(exports, args);
+    });
+};
+
 /**
  * Android only: Create notification channel
  * @param {Object} options channel options
@@ -264,6 +274,9 @@ exports.getDefaults = function () {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.createChannel = function (options, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('createChannel', arguments, 1);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     options = exports._optionsWithDefaults(options)
     exports._prepareOptions(options);
@@ -277,6 +290,9 @@ exports.createChannel = function (options, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.getChannel = function (channelId, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('getChannel', arguments, 1);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     if (typeof channelId !== 'string' || channelId.length === 0) {
         throw new TypeError('channelId must be a non-empty string');
@@ -298,6 +314,9 @@ exports.getChannel = function (channelId, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.createChannelGroup = function (options, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('createChannelGroup', arguments, 1);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     if (!options || typeof options.id !== 'string' || options.id.length === 0 ||
         typeof options.name !== 'string' || options.name.length === 0 ||
@@ -323,6 +342,9 @@ exports.createChannelGroup = function (options, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.getChannelGroup = function (groupId, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('getChannelGroup', arguments, 1);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     if (typeof groupId !== 'string' || groupId.length === 0) {
         throw new TypeError('groupId must be a non-empty string');
@@ -342,6 +364,9 @@ exports.getChannelGroup = function (groupId, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.deleteChannelGroup = function (groupId, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('deleteChannelGroup', arguments, 1);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     if (typeof groupId !== 'string' || groupId.length === 0) {
         throw new TypeError('groupId must be a non-empty string');
@@ -365,6 +390,9 @@ exports.deleteChannelGroup = function (groupId, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.deleteChannel = function (channelId, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('deleteChannel', arguments, 1);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports._exec('deleteChannel', channelId, callback, scope, errorCallback);
 };
@@ -375,6 +403,9 @@ exports.deleteChannel = function (channelId, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.hasPermission = function (callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('hasPermission', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports._exec('hasPermission', null, callback, scope, errorCallback);
 };
@@ -385,6 +416,9 @@ exports.hasPermission = function (callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.requestPermission = function (callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('requestPermission', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     console.log("Requesting permission");
     exports._exec('requestPermission', null, callback, scope, errorCallback);
@@ -396,6 +430,9 @@ exports.requestPermission = function (callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.canScheduleExactAlarms = function (callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('canScheduleExactAlarms', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports._exec('canScheduleExactAlarms', null, callback, scope, errorCallback);
 };
@@ -411,6 +448,12 @@ exports.canScheduleExactAlarms = function (callback, errorCallback) {
  * Omitted error handlers log to the console.
  */
 exports.schedule = function (optionsArg, callback, errorCallback, args) {
+    if (callback && typeof callback === 'object' && errorCallback == null && args == null) {
+        return exports._promise('schedule', [arguments[0], undefined, undefined, callback], 1);
+    }
+    if (callback == null && errorCallback == null) {
+        return exports._promise('schedule', arguments, 1);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     let optionsList = exports._toArray(optionsArg);
 
@@ -471,6 +514,12 @@ exports.schedule = function (optionsArg, callback, errorCallback, args) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.update = function (options, callback, errorCallback, args) {
+    if (callback && typeof callback === 'object' && errorCallback == null && args == null) {
+        return exports._promise('update', [arguments[0], undefined, undefined, callback], 1);
+    }
+    if (callback == null && errorCallback == null) {
+        return exports._promise('update', arguments, 1);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     const optionsList = exports._toArray(options);
 
@@ -505,6 +554,9 @@ exports.update = function (options, callback, errorCallback, args) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.clear = function (ids, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('clear', arguments, 1);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports._exec('clear', exports._convertIdsToNumbers(ids), callback, scope, errorCallback);
 };
@@ -515,6 +567,9 @@ exports.clear = function (ids, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.clearAll = function (callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('clearAll', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports._exec('clearAll', null, callback, scope, errorCallback);
 };
@@ -526,6 +581,9 @@ exports.clearAll = function (callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.cancel = function (ids, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('cancel', arguments, 1);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports._exec('cancel', exports._convertIdsToNumbers(ids), callback, scope, errorCallback);
 };
@@ -536,6 +594,9 @@ exports.cancel = function (ids, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.cancelAll = function (callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('cancelAll', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports._exec('cancelAll', null, callback, scope, errorCallback);
 };
@@ -547,6 +608,9 @@ exports.cancelAll = function (callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.isPresent = function (id, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('isPresent', arguments, 1);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports.getType(id, function (type) {
         exports._callbackWithScope(callback, scope)(type != 'unknown');
@@ -560,6 +624,9 @@ exports.isPresent = function (id, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.isScheduled = function (id, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('isScheduled', arguments, 1);
+    }
     exports.hasType(id, 'scheduled', callback, errorCallback);
 };
 
@@ -570,6 +637,9 @@ exports.isScheduled = function (id, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.isTriggered = function (id, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('isTriggered', arguments, 1);
+    }
     exports.hasType(id, 'triggered', callback, errorCallback);
 };
 
@@ -581,6 +651,9 @@ exports.isTriggered = function (id, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.hasType = function (id, type, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('hasType', arguments, 2);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports.getType(id, function (type2) {
         exports._callbackWithScope(callback, scope)(type == type2);
@@ -594,6 +667,9 @@ exports.hasType = function (id, type, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.getType = function (id, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('getType', arguments, 1);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports._exec('type', id, callback, scope, errorCallback);
 };
@@ -604,6 +680,9 @@ exports.getType = function (id, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.getIds = function (callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('getIds', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports._exec('ids', 0, callback, scope, errorCallback);
 };
@@ -614,6 +693,9 @@ exports.getIds = function (callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.getScheduledIds = function (callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('getScheduledIds', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports._exec('ids', 1, callback, scope, errorCallback);
 };
@@ -624,6 +706,9 @@ exports.getScheduledIds = function (callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.getTriggeredIds = function (callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('getTriggeredIds', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports._exec('ids', 2, callback, scope, errorCallback);
 };
@@ -639,6 +724,10 @@ exports.getTriggeredIds = function (callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.get = function () {
+    if (typeof arguments[0] !== 'function' && arguments[1] == null && arguments[2] == null) {
+        return arguments[0] == null ? exports._promise('getAll', [], 0) :
+            exports._promise('get', [arguments[0]], 1);
+    }
     var args = Array.apply(null, arguments);
 
     if (typeof args[0] == 'function') {
@@ -665,6 +754,9 @@ exports.get = function () {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.getAll = function (callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('getAll', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     this._exec('notifications', 0, callback, scope, errorCallback);
 };
@@ -676,6 +768,9 @@ exports.getAll = function (callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.getScheduled = function (callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('getScheduled', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     this._exec('notifications', 1, callback, scope, errorCallback);
 };
@@ -687,6 +782,9 @@ exports.getScheduled = function (callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.getTriggered = function (callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('getTriggered', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     this._exec('notifications', 2, callback, scope, errorCallback);
 };
@@ -699,6 +797,9 @@ exports.getTriggered = function (callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.addActions = function (actionsGroupId, actions, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('addActions', arguments, 2);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     this._exec('actions', [0, actionsGroupId, actions], callback, scope, errorCallback);
 };
@@ -710,6 +811,9 @@ exports.addActions = function (actionsGroupId, actions, callback, errorCallback)
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.removeActions = function (actionsGroupId, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('removeActions', arguments, 1);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     this._exec('actions', [1, actionsGroupId], callback, scope, errorCallback);
 };
@@ -721,6 +825,9 @@ exports.removeActions = function (actionsGroupId, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.hasActions = function (actionsGroupId, callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('hasActions', arguments, 1);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     this._exec('actions', [2, actionsGroupId], callback, scope, errorCallback);
 };
@@ -731,6 +838,9 @@ exports.hasActions = function (actionsGroupId, callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.openNotificationSettings = function (callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('openNotificationSettings', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     this._exec('openNotificationSettings', null, callback, scope, errorCallback);
 };
@@ -741,6 +851,9 @@ exports.openNotificationSettings = function (callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.openAlarmSettings = function (callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('openAlarmSettings', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     this._exec('openAlarmSettings', null, callback, scope, errorCallback);
 };
@@ -751,6 +864,9 @@ exports.openAlarmSettings = function (callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.iOSClearBadge = function (callback, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('iOSClearBadge', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     this._exec('clearBadge', null, callback, scope, errorCallback);
 }
@@ -761,6 +877,9 @@ exports.iOSClearBadge = function (callback, errorCallback) {
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.getUnusedAppRestrictionsStatus = function (successCallback, errorCallback) {
+    if (successCallback == null && errorCallback == null) {
+        return exports._promise('getUnusedAppRestrictionsStatus', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports._exec('getUnusedAppRestrictionsStatus', null, successCallback, scope, errorCallback);
 }
@@ -771,6 +890,9 @@ exports.getUnusedAppRestrictionsStatus = function (successCallback, errorCallbac
  * @param {Function|Object} errorCallback Receives native errors; omitted handlers log to the console. Legacy scope objects are still accepted.
  */
 exports.openManageUnusedAppRestrictions = function (successCallback, errorCallback) {
+    if (successCallback == null && errorCallback == null) {
+        return exports._promise('openManageUnusedAppRestrictions', arguments, 0);
+    }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
     exports._exec('openManageUnusedAppRestrictions', null, successCallback, scope, errorCallback);
 }
@@ -1179,6 +1301,9 @@ exports._convertIdsToNumbers = function (ids) {
  * @param {Function} errorCallback Receives native errors; omitted handlers log to the console.
  */
 exports._exec = function (action, options, callback, scope, errorCallback) {
+    if (callback == null && errorCallback == null) {
+        return exports._promise('_exec', arguments, 2);
+    }
     exec(
         exports._callbackWithScope(callback, scope),
         exports._callbackWithScope(errorCallback, scope) || function (error) {

@@ -38,3 +38,10 @@ The Abfuhrkalender app copy builds for iOS Simulator and initializes on iOS 26.5
 
 
 The final iOS 26.5 end-to-end check used the unchanged app Promise wrappers and the real notification center: permission check, scheduling, querying, updating, delivery, and cancellation all passed. In a separate controlled-error run, an injected native NSError crossed the real Cordova bridge: the legacy Promise stayed pending, exactly one error was logged, the app remained responsive, and an explicit error callback received the message. Android 16 showed the same behavior for a real missing-channel-group error. An invalid native Android trigger also reaches the error callback instead of escaping the worker thread.
+
+
+## Promise API
+
+`promises.test.js` exercises every callback-based asynchronous method without callbacks, using asynchronous bridge completions. It verifies resolution, native rejection, validation rejection, normal false/null results, unsupported-platform fallbacks, scheduling options, get() versus get([]), and legacy callback scope/return values.
+
+The Promise API also passed native end-to-end checks in the disposable Abfuhrkalender app copy on Android 16 and iOS 26.5: scheduling, updating, fetching one/all, cancellation, validation rejection, and rejection from a native failure. Android used a genuinely missing channel group; iOS used a controlled NSError injected into addNotificationRequest while leaving the plugin and Cordova bridge real. Existing application callback wrappers remained compatible. Both platform builds succeeded.
