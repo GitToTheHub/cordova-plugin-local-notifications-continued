@@ -1,6 +1,6 @@
 # Cordova Plugin Local Notifications — Continued
 
-<img src="images/logo.png" height="100">
+<img src="images/logo.png" height="100" alt="Local Notifications plugin logo">
 
 [![npm - Latest](https://img.shields.io/npm/v/cordova-plugin-local-notifications-continued/latest?label=Latest%20Release%20(npm))](https://npmjs.com/package/cordova-plugin-local-notifications-continued)
 [![GitHub](https://img.shields.io/github/package-json/v/GitToTheHub/cordova-plugin-local-notifications-continued?label=Development%20(Git))](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued)
@@ -38,12 +38,14 @@ The global `LocalNotifications` alias, Promise API, channel query ([`getChannel(
 
 ### Supported Platforms
 
-- Android 7.0+ (minimum version by cordova-android 13.0.0) with a minimum WebView Version 60 (Android 8 is shipped with a WebView version 58 and must be updated with Google Play Store before)
-- iOS 11.3+ (minimum version by cordova-ios 7.0.0)
+- Android 7.0+ with cordova-android 13.0.0 or newer and Android WebView 60 or newer. Update the WebView if the installed version is older.
+- iOS 11.3+ with cordova-ios 7.0.0 or newer.
+
+These are the plugin's baseline requirements. The Cordova platform version selected for your app may require a newer operating system.
 
 The examples use Promises with `async` / `await`. This syntax is supported from **Android WebView 55** and **iOS 10.3**, so it is covered by the plugin's minimum versions above. On Android, JavaScript syntax support depends on the installed WebView version, not just the Android version. See [MDN: await compatibility](https://github.com/mdn/browser-compat-data/blob/main/javascript/operators/await.json) and [WebKit: Safari 10.1 and iOS 10.3](https://webkit.org/blog/7477/new-web-features-in-safari-10-1/).
 
-Use `await` inside an `async` function, as shown in [Quick Start](#basics). The examples do not require top-level `await` (outside a function), which has different compatibility requirements.
+Use `await` inside an `async` function, as shown in [Quick Start](#basics). Using `await` in a function without `async`, or directly in a regular `<script>`, causes a JavaScript `SyntaxError`. Top-level `await` in JavaScript modules requires newer versions and is not needed by these examples.
 
 ### Installation
 
@@ -90,23 +92,21 @@ cordova plugin add https://github.com/GitToTheHub/cordova-plugin-local-notificat
 <a id="basics"></a>
 ## Quick Start
 
-Wait for Cordova's `deviceready` event before using `LocalNotifications`. The global `LocalNotifications` object and the legacy `cordova.plugins.notification.local` namespace refer to the same plugin instance. Existing applications can keep their current namespace. Avoid declaring your own global variable with the name `LocalNotifications`.
+Wait for Cordova's `deviceready` event before using `LocalNotifications`. The Quick Start shows the full event handler. Later examples use named `async` functions to make the required context explicit; call them only after `deviceready`. You can also place their bodies inside an existing `async` function or event handler. The global `LocalNotifications` object and the legacy `cordova.plugins.notification.local` namespace refer to the same plugin instance. Existing applications can keep their current namespace. Avoid declaring your own global variable with the name `LocalNotifications`.
 Check the current notification permission before scheduling so your app can respond if notifications are disabled. Users can revoke permission in system settings at any time; do not assume that an earlier grant still applies. This example uses [`requestPermission()`](#requestpermission) to check the current app-level permission and request it when the system allows a prompt.
 
 ```js
 document.addEventListener('deviceready', async () => {
     try {
-        const notifications = LocalNotifications;
-
         // Check the current app-level permission; the user may have revoked it.
         // Request permission if needed and handle a denial before scheduling.
-        const granted = await notifications.requestPermission();
+        const granted = await LocalNotifications.requestPermission();
         if (!granted) {
             console.log('Notification permission was not granted.');
             return;
         }
 
-        await notifications.schedule({
+        await LocalNotifications.schedule({
             id: 1,
             title: 'My first notification',
             text: 'Your reminder is ready.',
@@ -168,36 +168,39 @@ Use this check when revisiting notification settings, for example after the app 
 Android 7 has no notification channels, so only app-level settings are checked there. On Android 8 and newer, [`getChannel()`](#getchannel) combines app-level and channel-level blocking in `channel.enabled`. On Android 9 and newer, it also includes channel-group blocking.
 
 ```js
-try {
-    // Run inside an async function after deviceready.
-    if (cordova.platformId !== 'android') return;
+async function checkAndroidNotificationSettingsExample() {
+    try {
+        // Run inside an async function after deviceready.
+        if (cordova.platformId !== 'android') return;
 
-    const notifications = LocalNotifications;
-    const androidVersion = parseInt(device.version, 10);
+        const androidVersion = parseInt(device.version, 10);
 
-    if (androidVersion < 8) {
-        const enabled = await notifications.hasPermission();
-        console.log('Android 7 app notifications enabled:', enabled);
-        return;
+        if (androidVersion < 8) {
+            const enabled = await LocalNotifications.hasPermission();
+            console.log('Android 7 app notifications enabled:', enabled);
+            return;
+        }
+
+        // The default channel was created by the Quick Start notification.
+        const channelId = 'default_channel';
+        const channel = await LocalNotifications.getChannel(channelId);
+        if (channel === null) {
+            console.warn('Expected an existing channel. Check the channel ID and notification setup:', channelId);
+            return;
+        }
+
+        if (!channel.enabled) {
+            console.log('Notifications are blocked by app, channel, or channel-group settings. Please review Android notification settings.');
+            return;
+        }
+
+        console.log('Notifications are enabled for this channel.');
+    } catch (error) {
+        console.error(error);
     }
-
-    // The default channel was created by the Quick Start notification.
-    const channelId = 'default_channel';
-    const channel = await notifications.getChannel(channelId);
-    if (channel === null) {
-        console.warn('Expected an existing channel. Check the channel ID and notification setup:', channelId);
-        return;
-    }
-
-    if (!channel.enabled) {
-        console.log('Notifications are blocked by app, channel, or channel-group settings. Please review Android notification settings.');
-        return;
-    }
-
-    console.log('Notifications are enabled for this channel.');
-} catch (error) {
-    console.error(error);
 }
+
+checkAndroidNotificationSettingsExample();
 ```
 
 The version check uses `device.version` from `cordova-plugin-device`, a dependency of this plugin. Read it after `deviceready`.
@@ -387,7 +390,7 @@ See [Android documentation](https://developer.android.com/develop/background-wor
 ### App Hibernation / App Unused
 If your app runs on Android 12 and newer and the user doesn't interact with your app for 3 months, the system places your app in a hibernation state which will cancel all pending notifications and revokes permissions. When the user interacts with your app again, the app exits hibernation and the notifications will be re-scheduled. It doesn't count as app usage if the user dismisses a notification. If the app is hibernated, the user will get informed about it:
 
-<img width="320" src="images/android-app-hibernation-notification.png">
+<img width="320" src="images/android-app-hibernation-notification.png" alt="Android unused-app notification">
 
 The documentation says that permissions are also revoked, but testing the hibernation behavior on an Android 15 emulator showed, that the app keeps the permission to post notifications.
 
@@ -403,17 +406,17 @@ You can get the status of the setting by calling [getUnusedAppRestrictionsStatus
 
 Sample Android 12:
 
-<img width="240" src="images/android-app-hibernation-settings-android-12.png">
+<img width="240" src="images/android-app-hibernation-settings-android-12.png" alt="Android app hibernation settings android 12">
 
 On other Android versions it is named differently:
 
 Android 13/14:
 
-<img width="320" src="images/android-app-hibernation-settings-android-13-14.png">
+<img width="320" src="images/android-app-hibernation-settings-android-13-14.png" alt="Android app hibernation settings android 13 14">
 
 Android 15:
 
-<img width="320" src="images/android-app-hibernation-settings-android-15.png">
+<img width="320" src="images/android-app-hibernation-settings-android-15.png" alt="Android app hibernation settings android 15">
 
 ### Doze and Standby
 
@@ -499,8 +502,8 @@ actionsExample2();
 ```
 
 <p style="text-align: center;">
-    <img width="320" src="images/ios-actions.png">
-    <img width="320" src="images/android-actions.png">
+    <img width="320" src="images/ios-actions.png" alt="iOS notification with action buttons">
+    <img width="320" src="images/android-actions.png" alt="Android notification with action buttons">
 </p>
 
 On iOS the actions are not visible by default. You have to long press on the notification to see them.
@@ -556,7 +559,7 @@ actionInputExample2();
 
 | iOS          | Android      |
 | :----------- | :----------- |
-| <img width="240" src="images/ios-actions-with-input.png"> | <img width="240" src="images/android-actions-with-input-not-clicked.png"><br><img width="240" src="images/android-actions-with-input-clicked.png"> |
+| <img width="240" src="images/ios-actions-with-input.png" alt="iOS notification with a text reply field"> | <img width="240" src="images/android-actions-with-input-not-clicked.png" alt="Android notification with a reply action"><br><img width="240" src="images/android-actions-with-input-clicked.png" alt="Android notification with an expanded reply field"> |
 
 #### Read Input Data
 
@@ -591,9 +594,9 @@ These common properties can be specified for an action of type `button` or `inpu
 | id           | x       | x   | Action id. Also needed to listen to the [action event](#subscribe-to-an-action-event). |
 | title        | x       | x   | Title of the action button |
 | launch       | x       | x   | If the app should be launched, when the user clicks on an action button or sends the input of an action input. Default is `false`. |
-| ui           |         | x   | <img src="images/apple-icon.svg" width="16"> Can be set to `decline` which will display the action button with special highlighting to indicate that it performs a destructive task. Sets natively [UNNotificationActionOptionDestructive](https://developer.apple.com/documentation/usernotifications/unnotificationactionoptions/destructive?language=objc). |
-| needsAuth    |         | x   | <img src="images/apple-icon.svg" width="16"> If set to `true` the action can be performed only on an unlocked device. When the user selects an action with this option, the system prompts the user to unlock the device. After unlocking, the system notifies your app of the selected action. You might use option to perform actions that require accessing data that is encrypted while the device is locked. Sets natively [UNNotificationActionOptionAuthenticationRequired](https://developer.apple.com/documentation/usernotifications/unnotificationactionoptions/authenticationrequired?language=objc). |
-| icon         | x       |     | <img src="images/android-icon.svg" width="16"> Is not supported anymore for normal notifications since Android 7, see [Google Blog article for notifications on Android 7](https://android-developers.googleblog.com/2016/06/notifications-in-android-n.html). It will be only used on Android Wear. |
+| ui           |         | x   | <img src="images/apple-icon.svg" width="16" alt="iOS"> Can be set to `decline` which will display the action button with special highlighting to indicate that it performs a destructive task. Sets natively [UNNotificationActionOptionDestructive](https://developer.apple.com/documentation/usernotifications/unnotificationactionoptions/destructive?language=objc). |
+| needsAuth    |         | x   | <img src="images/apple-icon.svg" width="16" alt="iOS"> If set to `true` the action can be performed only on an unlocked device. When the user selects an action with this option, the system prompts the user to unlock the device. After unlocking, the system notifies your app of the selected action. You might use option to perform actions that require accessing data that is encrypted while the device is locked. Sets natively [UNNotificationActionOptionAuthenticationRequired](https://developer.apple.com/documentation/usernotifications/unnotificationactionoptions/authenticationrequired?language=objc). |
+| icon         | x       |     | <img src="images/android-icon.svg" width="16" alt="Android"> Is not supported anymore for normal notifications since Android 7, see [Google Blog article for notifications on Android 7](https://android-developers.googleblog.com/2016/06/notifications-in-android-n.html). It will be only used on Android Wear. |
 
 #### Action Input Properties
 
@@ -602,9 +605,9 @@ These properties can additionally be specified for an `input` action:
 | Property     | Android | iOS | Description |
 | :----------- | :------ | :-- | :---------- |
 | emptyText    | x       | x   | Placeholder text for input field. |
-| submitTitle  |         | x   | <img src="images/apple-icon.svg" width="16"> Title for submit button. Defaults to `Submit`. |
-| editable     | x       |     | <img src="images/android-icon.svg" width="16"> Specifies whether the user can provide arbitrary text values. If you specify `false`, you must provide a non-null and non-empty array for `choices`. Default is `true`. |
-| choices      | x       |     | <img src="images/android-icon.svg" width="16"> A String array of pre-defined choices for users input. You must provide a non-null and non-empty array if you disabled free form input by setting `editable` to `false`. |
+| submitTitle  |         | x   | <img src="images/apple-icon.svg" width="16" alt="iOS"> Title for submit button. Defaults to `Submit`. |
+| editable     | x       |     | <img src="images/android-icon.svg" width="16" alt="Android"> Specifies whether the user can provide arbitrary text values. If you specify `false`, you must provide a non-null and non-empty array for `choices`. Default is `true`. |
+| choices      | x       |     | <img src="images/android-icon.svg" width="16" alt="Android"> A String array of pre-defined choices for users input. You must provide a non-null and non-empty array if you disabled free form input by setting `editable` to `false`. |
 
 ## Triggers
 
@@ -683,7 +686,7 @@ repeatingExample();
 | before        | Date    |                  | x       |     | |
 | firstAt       | Date    |                  | x       |     | |
 | count         | Int     |                  | x       |     |      |
-| every         | String  | `minute`, `hour`, `day`, `week`, `month`, `quarter` <img src="images/android-icon.svg" width="16">, `year` | x       | x   | |
+| every         | String  | `minute`, `hour`, `day`, `week`, `month`, `quarter` <img src="images/android-icon.svg" width="16" alt="Android">, `year` | x       | x   | |
 
 Trigger every time the date matches:
 
@@ -708,10 +711,10 @@ repeatingExample2();
 | before        | Date    |                  | x       |     | |
 | after         | Date    |                  | x       |     | |
 | count         | Int     |                  | x       |     |      |
-| every         | Object  | `minute`, `hour`, `day`, `weekday`, `weekdayOrdinal` <img src="images/apple-icon.svg" width="16">, `week` <img src="images/apple-icon.svg" width="16">, `weekOfMonth`, `month`, `quarter`  <img src="images/apple-icon.svg" width="16"> | x       | x   | |
+| every         | Object  | `minute`, `hour`, `day`, `weekday`, `weekdayOrdinal` <img src="images/apple-icon.svg" width="16" alt="iOS">, `week` <img src="images/apple-icon.svg" width="16" alt="iOS">, `weekOfMonth`, `month`, `quarter`  <img src="images/apple-icon.svg" width="16" alt="iOS"> | x       | x   | |
 
 ### Location Based
-<img src="images/apple-icon.svg" width="16"> iOS only
+<img src="images/apple-icon.svg" width="16" alt="iOS"> iOS only
 
 To trigger when the user enters a region:
 
@@ -723,7 +726,7 @@ async function locationBasedExample() {
             title: 'Welcome to our office',
             trigger: {
                 type: 'location',
-                center: [x, y],
+                center: [52.52, 13.405], // Example latitude and longitude; replace with your location.
                 radius: 15,
                 notifyOnEntry: true
             }
@@ -745,7 +748,7 @@ locationBasedExample();
 | single        | Boolean |                  |         | x   |      |
 
 ## Progress
-<img src="images/android-icon.svg" width="16"> Android only
+<img src="images/android-icon.svg" width="16" alt="Android"> Android only
 
 Notifications can include an animated progress indicator that shows users the status of an ongoing operation.
 
@@ -771,7 +774,7 @@ progressExample();
 ```
 
 <p style="text-align: center;">
-    <img src="images/android-progress.png">
+    <img src="images/android-progress.png" alt="Android notification with a progress bar">
 </p>
 
 Calls [NotificationCompat.Builder#setProgress(int,int,boolean)](https://developer.android.com/reference/androidx/core/app/NotificationCompat.Builder#setProgress(int,int,boolean))
@@ -789,7 +792,7 @@ Use determinate mode for the progress bar when you want to show that a specific 
 See [ProgressBar#determinate-progress](https://developer.android.com/reference/android/widget/ProgressBar.html#determinate-progress)
 
 ## Patterns
-<img src="images/android-icon.svg" width="16"> Android only
+<img src="images/android-icon.svg" width="16" alt="Android"> Android only
 
 Split the text by line breaks if the message comes from a single person and just too long to show in a single line.
 
@@ -812,11 +815,11 @@ patternsExample();
 ```
 
 <p style="text-align: center;">
-    <img src="images/android-inbox.png">
+    <img src="images/android-inbox.png" alt="Android inbox-style notification">
 </p>
 
 ## Summarizing
-<img src="images/android-icon.svg" width="16"> Android only
+<img src="images/android-icon.svg" width="16" alt="Android"> Android only
 
 Instead of displaying multiple notifications, you can create one notification that summarizes them all.
 
@@ -842,7 +845,7 @@ summarizingExample();
 ```
 
 <p style="text-align: center;">
-    <img src="images/android-chat.png">
+    <img src="images/android-chat.png" alt="Android messaging-style notification">
 </p>
 
 To add a new message to the existing chat:
@@ -885,7 +888,7 @@ Possible values:
 - `shared://personIcon.png` - Resource from the shared folder, see [documentation](#resource-pattern-shared)
 
 ## Grouping
-<img src="images/android-icon.svg" width="16"> Android only
+<img src="images/android-icon.svg" width="16" alt="Android"> Android only
 
 Your app can present multiple notifications as a single group:
 
@@ -931,7 +934,7 @@ groupingExample();
 ```
 
 <p style="text-align: center;">
-    <img src="images/android-stack.png">
+    <img src="images/android-stack.png" alt="Grouped Android notifications">
 </p>
 
 ## Android Channels
@@ -951,15 +954,13 @@ Add your audio file to `www/audio/reminder.mp3` in your Cordova app, then rebuil
 async function androidChannelWithACustomSoundExample() {
     try {
         if (cordova.platformId === 'android') {
-            const notifications = LocalNotifications;
-
-            const granted = await notifications.requestPermission();
+            const granted = await LocalNotifications.requestPermission();
             if (!granted) {
                 console.log('Android: notification permission is denied.');
                 return;
             }
 
-            await notifications.schedule({
+            await LocalNotifications.schedule({
                 id: 70,
                 title: 'Appointment reminder',
                 text: 'Your appointment starts soon.',
@@ -994,16 +995,14 @@ Create a group first, then pass its ID as [`androidChannelGroupId`](#channel-gro
 async function channelGroupsExample() {
     try {
         if (cordova.platformId === 'android') {
-            const notifications = LocalNotifications;
-
-            const supported = await notifications.createChannelGroup({
+            const supported = await LocalNotifications.createChannelGroup({
                 id: 'household',
                 name: 'Household',
                 description: 'Reminders for this household'
             });
             if (!supported) return; // Channel groups require Android 8 or newer.
 
-            await notifications.schedule({
+            await LocalNotifications.schedule({
                 id: 50,
                 title: 'Collection reminder',
                 text: 'Put out the recycling bin tonight.',
@@ -1097,12 +1096,12 @@ This tells Android that your app wants to have the permission to schedule exact 
 
 |      |      |
 | :--- | :--- |
-| <img width="320" src="images/android-alarms-and-reminders-in-app-settings.png" /> | After declaring `SCHEDULE_EXACT_ALARM` as permission, your app have a new entry in the app settings called `Alarms & reminders`, where the user can enable/disable exact alarms. |
-| <img width="320" src="images/android-alarms-and-reminders-setting.png" /> | Clicking on this entry will open the setting to enable/disable exact alarms. This screen will also been shown if you call [openAlarmSettings](#openalarmsettings) |
+| <img width="320" src="images/android-alarms-and-reminders-in-app-settings.png"  alt="Alarms and reminders entry in Android app settings" /> | After declaring `SCHEDULE_EXACT_ALARM` as permission, your app have a new entry in the app settings called `Alarms & reminders`, where the user can enable/disable exact alarms. |
+| <img width="320" src="images/android-alarms-and-reminders-setting.png"  alt="Android exact-alarm permission setting" /> | Clicking on this entry will open the setting to enable/disable exact alarms. This screen will also been shown if you call [openAlarmSettings](#openalarmsettings) |
 
-On Android 12 `SCHEDULE_EXACT_ALARM` is pre-granted. On Android 13 and newer the user has to permit this in the "Alarms & Reminders" setting, which you can open by [openAlarmSettings](#openalarmsettings). You can use the [resume](https://cordova.apache.org/docs/en/12.x/cordova/events/events.html#resume) event of Cordova to check if exact alarms are permitted by [canScheduleExactAlarms](#canscheduleexactalarms). If you have already posted inexact alarms, before the user granted the exact alarm permission, inexact alarms will be automatically rescheduled by this plugin as exact alarms. The downside is, when the user revokes the exact alarm permission, your app will be killed and all exact alarms will be canceled without rescheduling them as inexact alarms. You have to reschedule them the next time the user starts your app. You can read everything about it in the [Android documentation](https://developer.android.com/about/versions/14/changes/schedule-exact-alarms).
+Starting with Android 14, `SCHEDULE_EXACT_ALARM` is denied by default for most newly installed apps targeting Android 13 (API 33) or newer. Exemptions and upgrade history can affect the initial status, so always read the current value with [canScheduleExactAlarms](#canscheduleexactalarms). If permission is needed, explain why and offer [openAlarmSettings](#openalarmsettings) to open "Alarms & reminders". You can use the [resume](https://cordova.apache.org/docs/en/12.x/cordova/events/events.html#resume) event of Cordova to check if exact alarms are permitted by [canScheduleExactAlarms](#canscheduleexactalarms). If you have already posted inexact alarms, before the user granted the exact alarm permission, inexact alarms will be automatically rescheduled by this plugin as exact alarms. The downside is, when the user revokes the exact alarm permission, your app will be killed and all exact alarms will be canceled without rescheduling them as inexact alarms. You have to reschedule them the next time the user starts your app. You can read everything about it in the [Android documentation](https://developer.android.com/about/versions/14/changes/schedule-exact-alarms).
 
-### Exact Alarms: Define Your App as a Calender or Alarm Clock App
+### Exact Alarms: Define Your App as a Calendar or Alarm Clock App
 This is a very special case you should think about. When you declare your app as a calendar or alarm clock app, the app have to fullfill the requirements and must be approved by Google in the Play Store. Google could remove the app from the store if the app is found to be misusing the permission.
 
 Calendar or alarm clock apps need to send calendar reminders, wake-up alarms, or alerts when the app is no longer running. These apps can request the [USE_EXACT_ALARM](https://developer.android.com/reference/android/Manifest.permission#USE_EXACT_ALARM) permission. The `USE_EXACT_ALARM` permission will be granted on install, and apps holding this permission will be able to schedule exact alarms just like apps with the `SCHEDULE_EXACT_ALARM` permission. The advantage is, that this permission can't be revoked by the user.
@@ -1124,7 +1123,7 @@ Then add the following [config-file](https://cordova.apache.org/docs/en/12.x/plu
 </config-file>
 ```
 
-The permission `SCHEDULE_EXACT_ALARM` must be decared to be backward compatible with Android 12. The is why the permission is limited by `android:maxSdkVersion="32"`, see [StackOverflow](https://stackoverflow.com/questions/73972021/android-permission-schedule-exact-alarm-required-with-use-exact-alarm-for-alarm) or the documentation of [USE_EXACT_ALARM](https://developer.android.com/reference/android/Manifest.permission#USE_EXACT_ALARM).
+The permission `SCHEDULE_EXACT_ALARM` must be declared to be backward compatible with Android 12. This is why the permission is limited by `android:maxSdkVersion="32"`, see [StackOverflow](https://stackoverflow.com/questions/73972021/android-permission-schedule-exact-alarm-required-with-use-exact-alarm-for-alarm) or the documentation of [USE_EXACT_ALARM](https://developer.android.com/reference/android/Manifest.permission#USE_EXACT_ALARM).
 
 The permission `USE_EXACT_ALARM` exists since Android 13 and will be used from then on.
 
@@ -1247,12 +1246,10 @@ Most methods that communicate with the native platform are asynchronous. Use `aw
 ```js
 async function methodsExample() {
     try {
-        const notifications = LocalNotifications;
-
-        const pending = await notifications.getScheduled();
+        const pending = await LocalNotifications.getScheduled();
         console.log('Pending notifications:', pending);
 
-        await notifications.cancel(10);
+        await LocalNotifications.cancel(10);
         console.log('Notification 10 canceled.');
     } catch (error) {
         console.error(error);
@@ -1265,14 +1262,13 @@ methodsExample();
 Asynchronous methods return a Promise when called without callbacks. Use `await` inside an `async` function and handle failures with `try` / `catch`:
 
 ```js
-async function scheduleReminder() {
-    const notifications = LocalNotifications;
+async function methodsExample2() {
     try {
-        if (!await notifications.requestPermission()) {
+        if (!await LocalNotifications.requestPermission()) {
             console.log('Notification permission was denied.');
             return;
         }
-        await notifications.schedule({
+        await LocalNotifications.schedule({
             id: 1,
             title: 'Appointment reminder',
             text: 'Your appointment starts soon.',
@@ -1282,6 +1278,8 @@ async function scheduleReminder() {
         console.error('Could not schedule the reminder:', error);
     }
 }
+
+methodsExample2();
 ```
 
 The Promise resolves with the operation result. Native failures and JavaScript validation errors reject it. Permission denial (`false`) and missing channels (`null`) are normal fulfilled results. `get()` without arguments returns all notifications. For scheduling options, use `schedule(options, { skipPermission: true })` or `update(options, { skipPermission: true })`.
@@ -1349,15 +1347,14 @@ Schedule one notification object or an array of notification objects. See [Quick
 Promise signature: `schedule(options, args)`. The `args` object is optional. See [Callback Compatibility](#callback-compatibility) for older calls. A missing channel is created automatically using the supplied channel properties or the default channel settings.
 
 ### canScheduleExactAlarms
-<img src="images/android-icon.svg" width="16"> Android only
+<img src="images/android-icon.svg" width="16" alt="Android"> Android only
 
-Checks if the user has enabled the "Alarms & Reminders"-setting. If not, the notificiatons will be scheduled inexact, which is still ok and will only be delayed by some minutes.
+Checks whether Android currently allows exact alarms. Without this permission, the plugin uses inexact scheduling; delivery may be delayed, depending on system and power-saving conditions.
 - On Android 11 and older, the Promise always resolves to `true`.
-- On Android 12 the permission is granted by default
-- On Android 13 and newer, the permission is not granted by default and have to be explicitly enabled by the user.
+- On Android 12 and newer, check the returned status rather than assuming a default. Android 14 denies this permission by default for most new installations targeting API 33 or newer; see [exact alarm permission](#exact-alarms-user-grants-permission).
 
 ### createChannel
-<img src="images/android-icon.svg" width="16"> Android only
+<img src="images/android-icon.svg" width="16" alt="Android"> Android only
 
 Creates an Android notification channel if it does not already exist. Reusing its ID does not reset its sound, vibration, or importance. See [Android channels](#android-channels).
 If a notification does not specify an [androidChannelId](#property-androidchannelid), the [default channel](#default-channel) is used.
@@ -1367,7 +1364,7 @@ To post a notification to this channel, pass its [androidChannelId](#property-an
 Channel configuration example:
 
 ```js
-async function createchannelExample() {
+async function createChannelExample() {
     try {
         await LocalNotifications.createChannel({
             androidChannelId: "my_channel_01", // string, to separate something in the id, use "_" instead of "-"
@@ -1385,7 +1382,7 @@ async function createchannelExample() {
     }
 }
 
-createchannelExample();
+createChannelExample();
 ```
 
 Await the returned Promise when the next operation depends on channel creation having completed. You do not need a separate [`createChannel()`](#createchannel) call when scheduling: [`schedule()`](#schedule) creates the selected channel automatically if needed, as shown in the [combined platform example](#one-notification-with-platform-specific-options).
@@ -1404,7 +1401,7 @@ Android 8 and newer. Creates a notification channel group or updates its name an
 
 Promise signature: `createChannelGroup({ id, name, description })`.
 
-- [`id`](#property-id) and `name` must be non-empty strings.
+- `id` and `name` must be non-empty strings.
 - `description` is a string or `null`; it is supported on Android 9 and newer. Omitting it clears the description when updating a group.
 - The Promise resolves to `true` on Android 8 and newer, or `false` on Android 7 and iOS.
 
@@ -1416,7 +1413,7 @@ See [Channel Groups](#channel-groups) for a complete example. Native failures re
 Android 8 and newer. Reads a group's current settings without creating or changing it.
 
 ```js
-async function getchannelgroupExample() {
+async function getChannelGroupExample() {
     try {
         const group = await LocalNotifications.getChannelGroup('household');
         if (group === null) return;
@@ -1428,14 +1425,14 @@ async function getchannelgroupExample() {
     }
 }
 
-getchannelgroupExample();
+getChannelGroupExample();
 ```
 
-Promise signature: `getChannelGroup(groupId)`. `groupId` must be a non-empty string. The Promise resolves to `null` for a missing or deleted group, on Android 7, or on iOS. Otherwise it receives:
+Promise signature: `getChannelGroup(groupId)`. `groupId` must be a non-empty string. The Promise resolves to `null` for a missing or deleted group, on Android 7, or on iOS. Otherwise the Promise resolves to:
 
 | Field | Type | Meaning |
 | :---- | :--- | :------ |
-| [`id`](#property-id) | string | Group ID. |
+| `id` | string | Group ID. |
 | `name` | string | Current user-visible name. |
 | `description` | string or null | Group description; `null` on Android 8. |
 | `blocked` | boolean | Whether the user has blocked the group. Supported on Android 9 and newer; otherwise `false`. |
@@ -1449,7 +1446,7 @@ Native failures reject the Promise. See [Callback Compatibility](#callback-compa
 Android 8 and newer. **Deletes the group and all channels belonging to it.** This can remove their posted notifications. Pending notification schedules are not canceled; cancel or update them separately when removing a group your reminders use.
 
 ```js
-async function deletechannelgroupExample() {
+async function deleteChannelGroupExample() {
     try {
         const supported = await LocalNotifications.deleteChannelGroup('household');
         if (supported) console.log('Group and its channels deleted.');
@@ -1458,7 +1455,7 @@ async function deletechannelgroupExample() {
     }
 }
 
-deletechannelgroupExample();
+deleteChannelGroupExample();
 ```
 
 Promise signature: `deleteChannelGroup(groupId)`. `groupId` must be a non-empty string. Deleting an unknown group has no effect. The Promise resolves to `true` on Android 8 and newer, or `false` on Android 7 and iOS. Native failures reject the Promise. See [Callback Compatibility](#callback-compatibility) for older calls.
@@ -1469,7 +1466,7 @@ Promise signature: `deleteChannelGroup(groupId)`. `groupId` must be a non-empty 
 Android 8 and newer. Reads the current system settings of a notification channel, including changes made by the user. This method does not create, restore, or modify a channel.
 
 ```js
-async function getchannelExample() {
+async function getChannelExample() {
     try {
         const channel = await LocalNotifications.getChannel('appointment_reminders');
         if (channel === null) {
@@ -1489,7 +1486,7 @@ async function getchannelExample() {
     }
 }
 
-getchannelExample();
+getChannelExample();
 ```
 
 Promise signature: `getChannel(channelId)`. `channelId` must be a non-empty string. Native failures reject the Promise. See [Callback Compatibility](#callback-compatibility) for older calls.
@@ -1500,7 +1497,7 @@ For an existing channel, the Promise resolves to:
 
 | Field | Type | Meaning |
 | :---- | :--- | :------ |
-| [`id`](#property-id) | string | Channel ID. |
+| `id` | string | Channel ID. |
 | `name` | string | Current user-visible channel name. |
 | `description` | string or null | Channel description. |
 | `importance` | number | Current Android importance: `0` = none, `1` = minimum, `2` = low, `3` = default, `4` = high, `5` = maximum. |
@@ -1521,14 +1518,14 @@ See [Android Channels](#android-channels), [NotificationChannel](https://develop
 
 
 ### deleteChannel
-<img src="images/android-icon.svg" width="16"> Android only
+<img src="images/android-icon.svg" width="16" alt="Android"> Android only
 
 Deletes an Android notification channel by ID.
 
 Example:
 
 ```js
-async function deletechannelExample() {
+async function deleteChannelExample() {
     try {
         await LocalNotifications.deleteChannel('my_channel_id');
         console.log('Channel deletion completed.');
@@ -1537,7 +1534,7 @@ async function deletechannelExample() {
     }
 }
 
-deletechannelExample();
+deleteChannelExample();
 ```
 
 Deleting a channel also removes its associated notifications. If you create a new channel with the same id, the deleted channel will be un-deleted with all of the same settings it had before it was deleted, see [NotificationManagerCompat.deleteNotificationChannel](https://developer.android.com/reference/androidx/core/app/NotificationManagerCompat#deleteNotificationChannel(java.lang.String))
@@ -1559,7 +1556,7 @@ Returns the status of unused app restrictions also called [app hibernation](#app
 Sample:
 
 ```js
-async function getunusedapprestrictionsstatusExample() {
+async function getUnusedAppRestrictionsStatusExample() {
     try {
         await LocalNotifications.getUnusedAppRestrictionsStatus(
             (status) => {
@@ -1577,7 +1574,7 @@ async function getunusedapprestrictionsstatusExample() {
     }
 }
 
-getunusedapprestrictionsstatusExample();
+getUnusedAppRestrictionsStatusExample();
 ```
 
 Possible status codes:
@@ -1595,7 +1592,7 @@ Possible status codes:
 Checks if the app has permissions to post notifications.
 
 ```js
-async function haspermissionExample() {
+async function hasPermissionExample() {
     try {
         const granted = await LocalNotifications.hasPermission();
         console.log('App notification permission:', granted);
@@ -1604,25 +1601,25 @@ async function haspermissionExample() {
     }
 }
 
-haspermissionExample();
+hasPermissionExample();
 ```
 
 ### iOSClearBadge
 Clears the badge.
 
 ### openAlarmSettings
-<img src="images/android-icon.svg" width="16"> Android only. Since Android 12 (SDK 31).
+<img src="images/android-icon.svg" width="16" alt="Android"> Android only. Since Android 12 (SDK 31).
 
 Opens the `Alarms & reminders` setting as an Activity when running on Android 12 (SDK 31) or later, where the user can enable exact alarms.
 
-<img width="240" src="images/android-alarms-and-reminders-setting.png" />
+<img width="240" src="images/android-alarms-and-reminders-setting.png"  alt="Android exact-alarm permission setting" />
 
 This is only available, if [SCHEDULE_EXACT_ALARM](#exact-alarms-user-grants-permission) is declared as permission in the `AndroidManifest.xml`.
 
 This method will not wait for the user to be returned back to the app. For this, the `resume`-event can be used. The Promise resolves after opening the settings; it does not wait for the user to return.
 - If the user grants permission, already inexact scheduled notifications will be rescheduled as exact alarms.
 - If exact alarms were already granted and the user revokes it, the app will be killed and all scheduled notifications will be canceled. The app have to schedule the notifications as inexact alarms again, when the app is opened the next time, see https://developer.android.com/develop/background-work/services/alarms/schedule#using-schedule-exact-permission.
-- On Android older then 12, the Promise resolves without opening settings.
+- On Android older than 12, the Promise resolves without opening settings.
 
 ### openManageUnusedAppRestrictions
 
@@ -1631,16 +1628,16 @@ Opens the unused app restriction settings directly in your app. The Promise reso
 Sample:
 
 ```js
-async function openmanageunusedapprestrictionsExample() {
+async function openManageUnusedAppRestrictionsExample() {
     try {
-        const result = await LocalNotifications.openManageUnusedAppRestrictions();
+        await LocalNotifications.openManageUnusedAppRestrictions();
         // User has returned from the settings
     } catch (error) {
         console.error(error);
     }
 }
 
-openmanageunusedapprestrictionsExample();
+openManageUnusedAppRestrictionsExample();
 ```
 
 After awaiting this method, check the current status with [getUnusedAppRestrictionsStatus](#getunusedapprestrictionsstatus).
@@ -1655,7 +1652,7 @@ Opens the notifications settings of the app on Android 8 and newer. This method 
 Request permission to post notifications. This is called automatically by the plugin when scheduling notifications, but you can also request it manually before scheduling notifications:
 
 ```js
-async function requestpermissionExample() {
+async function requestPermissionExample() {
     try {
         const granted = await LocalNotifications.requestPermission();
         console.log('App notification permission:', granted);
@@ -1664,7 +1661,7 @@ async function requestpermissionExample() {
     }
 }
 
-requestpermissionExample();
+requestPermissionExample();
 ```
 
 The system may show a permission dialog, depending on the platform and the user's previous choice. The Promise resolves to `true` when permission is granted, or `false` when it is denied. Native errors reject the Promise.
@@ -1981,9 +1978,9 @@ Supported resource patterns:
 
 Example folded and unfolded:
 
-<img width="320" src="images/android-attachments-image-folded.png">
+<img width="320" src="images/android-attachments-image-folded.png" alt="Android attachments image folded">
 
-<img width="320" src="images/android-attachments-image-unfolded.png">
+<img width="320" src="images/android-attachments-image-unfolded.png" alt="Android attachments image unfolded">
 
 The notification will be automatically unfolded in the notification center if your app presents only one notification. On the lockscreen the notification is always folded.
 
@@ -2000,9 +1997,9 @@ If you attach an image, the image will shown as a small image to the right in th
 
 Example folded and unfolded:
 
-<img width="320" src="images/ios-attachments-image-folded.png">
+<img width="320" src="images/ios-attachments-image-folded.png" alt="Ios attachments image folded">
 
-<img width="320" src="images/ios-attachments-image-unfolded.png">
+<img width="320" src="images/ios-attachments-image-unfolded.png" alt="Ios attachments image unfolded">
 
 ##### Code Example
 
