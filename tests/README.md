@@ -26,7 +26,7 @@ The error-callback change was checked against the unchanged `NotificationPluginP
 
 A disposable copy of the app builds for Android with only its plugin dependency replaced. On an Android 16 emulator, the app initializes, its original permission and scheduling Promise wrappers resolve, the scheduled notification can be queried and canceled, and a missing channel group reaches the new native error callback.
 
-This does not cover every app workflow or an iOS device run. A Promise wrapper that only supplies a success callback remains pending after a native error; the plugin logs the error but cannot reject a Promise it does not own.
+This does not cover every app workflow or a physical iOS device run. A Promise wrapper that only supplies a success callback remains pending after a native error; the plugin logs the error but cannot reject a Promise it does not own.
 
 ## iOS Native Error Probe
 
@@ -35,3 +35,6 @@ This does not cover every app workflow or an iOS device run. A Promise wrapper t
 Build with the simulator SDK, ARC, Foundation, UIKit, UserNotifications, and the host Cordova include directory. Load it only into a disposable simulator app with `SIMCTL_CHILD_DYLD_INSERT_LIBRARIES` and `xcrun simctl launch --console`. Success logs `IOS_NATIVE_PROBE_ALL_PASS`. Never include this probe in a distributed app.
 
 The Abfuhrkalender app copy builds for iOS Simulator and initializes on iOS 26.5 with the modified native plugin. The original app source remains unchanged.
+
+
+The final iOS 26.5 end-to-end check used the unchanged app Promise wrappers and the real notification center: permission check, scheduling, querying, updating, delivery, and cancellation all passed. In a separate controlled-error run, an injected native NSError crossed the real Cordova bridge: the legacy Promise stayed pending, exactly one error was logged, the app remained responsive, and an explicit error callback received the message. Android 16 showed the same behavior for a real missing-channel-group error. An invalid native Android trigger also reaches the error callback instead of escaping the worker thread.

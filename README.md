@@ -1111,7 +1111,7 @@ In the table, **pending** means scheduled for future delivery; **delivered** mea
 
 Schedule one notification object or an array of notification objects. See [Quick Start](#basics) and [Notification Examples](#notification-examples) for complete examples.
 
-Signature: `schedule(options, callback, errorCallback, args)`. The callback and scope are optional. Omit `args` unless you need additional scheduling options. A missing channel is created automatically using the supplied channel properties or the default channel settings.
+Signature: `schedule(options, callback, errorCallback, args)`. The success and error callbacks are optional. A legacy scope object is still accepted in the error-callback position. Omit `args` unless you need additional scheduling options. A missing channel is created automatically using the supplied channel properties or the default channel settings.
 
 ### canScheduleExactAlarms
 <img src="images/android-icon.svg" width="16"> Android only

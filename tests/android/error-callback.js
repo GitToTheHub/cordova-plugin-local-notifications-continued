@@ -13,6 +13,9 @@ document.addEventListener('deviceready', async () => {
         });
     }
     try {
+        await expectFailure((success, error) => cordova.exec(success, error,
+            'LocalNotification', 'schedule', [{ id: 90000, trigger: {} }]), 'Trigger not property set');
+        console.log('ERROR_CALLBACK_NATIVE_PASS invalid-trigger');
         await expectFailure((success, error) => n.createChannel({
             androidChannelId: prefix + '_channel', androidChannelGroupId: prefix + '_missing'
         }, success, error));

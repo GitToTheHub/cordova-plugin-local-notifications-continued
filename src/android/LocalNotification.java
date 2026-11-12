@@ -342,15 +342,15 @@ public class LocalNotification extends CordovaPlugin {
      */
     private void schedule(JSONArray optionsJSONList, CallbackContext callbackContext) {
         for (int index = 0; index < optionsJSONList.length(); index++) {
-            Notification notification = new Notification(getContext(), optionsJSONList.optJSONObject(index));
+            JSONObject options = optionsJSONList.optJSONObject(index);
+            Notification notification;
             boolean scheduled;
             try {
+                notification = new Notification(getContext(), options);
                 scheduled = notification.scheduleNext();
             } catch (Exception e) {
                 // Invalid channel/group configuration, channel limits, or denied alarm/sound access.
-                Log.e(TAG, "Could not schedule notification, notificationId=" + notification.getId()
-                    + ", channelId=" + notification.getOptions().getAndroidChannelId()
-                    + ", groupId=" + notification.getOptions().getAndroidChannelGroupId(), e);
+                Log.e(TAG, "Could not schedule notification, options=" + options, e);
                 callbackContext.error(e.getMessage());
                 return;
             }
@@ -509,7 +509,16 @@ public class LocalNotification extends CordovaPlugin {
 
             JSONObject updateOptions = optionsList.optJSONObject(index);
             int notificationId = updateOptions.optInt("id", 0);
-            Notification notification = getManager().update(notificationId, updateOptions);
+            Notification notification;
+            try {
+                notification = getManager().update(notificationId, updateOptions);
+            } catch (Exception e) {
+                // Reposting a delivered notification can fail in NotificationManager.notify().
+                Log.e(TAG, "Could not update notification, notificationId=" + notificationId
+                    + ", updates=" + updateOptions, e);
+                callbackContext.error(e.getMessage());
+                return;
+            }
             
             // Notification didn't exist and couldn't be updated
             if (notification == null) continue;
