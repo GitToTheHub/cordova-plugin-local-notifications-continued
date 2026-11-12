@@ -1,15 +1,22 @@
 # ChangeLog
 
-## Version 1.2.5-dev
+## 1.2.5-dev
 
-### Android
+**Features:**
 
-- feat(android): support notification channel groups with `createChannelGroup()`, `getChannelGroup()`, `deleteChannelGroup()`, and `androidChannelGroupId`. Group creation and assignment require Android 8; descriptions and group blocking require Android 9. Deleting a group also deletes its channels.
-- feat(android): add `channel.enabled` to the `getChannel()` result as a combined app, channel, and channel-group status. Existing detailed status fields remain available; `enabled` does not guarantee sound or delivery.
-- feat(android): add `getChannel(channelId, callback, scope)` to query current channel settings, app notification status, and channel/group blocking without creating the channel. Returns `null` for missing channels or unsupported platforms.
+- feat(android): add `getChannel()` to read notification channel settings ([#10](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/10))
+- feat(android): add `channel.enabled` to check whether app, channel, or group settings block notifications ([#12](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/12))
+- feat(android): support notification channel groups ([#13](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/13))
+
+**Fixes:**
+
 - fix(android): reduce notification image memory usage while preserving crop quality ([#6](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/6), [#7](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/7), [#8](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/8))
-  - Downsample file-based images during decoding using Google's `calculateInSampleSize` helper, based on notification icon or screen dimensions. Retain enough resolution for cropping, guard against invalid target dimensions, and close image streams to reduce memory usage and address a Play Console performance warning.
-  - Fixes [Issue #2103](https://github.com/katzer/cordova-plugin-local-notifications/issues/2103).
+
+**Others:**
+
+- chore: prepare version 1.2.5-dev and group pending fixes ([#11](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/11))
+- docs: remove unnecessary callback scope from examples ([#9](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/9))
+- docs: consolidate notification image fixes in changelog ([#16](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/16))
 
 ## Version 1.2.4
 
