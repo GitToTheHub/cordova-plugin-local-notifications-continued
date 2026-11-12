@@ -1059,7 +1059,7 @@ notifications.cancel(10, () => {
 
 Native methods accept an optional success callback followed by an error callback. Existing object arguments such as `this` in the former callback-scope position remain supported. Event listeners registered with `on()` retain their callback scope.
 
-The error callback receives native failures. Without one, the plugin logs the error to the JavaScript console. Success callbacks do not run on failure. Promise wrappers that only resolve from a success callback remain pending on native failure; supply a rejection handler if the app needs to recover. Permission denial (`false`) and missing channels (`null`) remain normal success results.
+The error callback receives native failures. Without one, the plugin logs the error to the JavaScript console. Success callbacks do not run on failure. On iOS, scheduling and updating wait for the native completion handlers; a batch stops at its first failed request, without rolling back earlier successful requests. Authorization errors reach the error callback, while an ordinary permission denial remains a successful `false` result. Promise wrappers that only resolve from a success callback remain pending on native failure; supply a rejection handler if the app needs to recover. Permission denial (`false`) and missing channels (`null`) remain normal success results.
 
 For `schedule()` and `update()`, the argument order is `options, successCallback, errorCallback, args`; legacy scope objects in the third position remain supported.
 
