@@ -162,6 +162,12 @@ public class LocalNotification extends CordovaPlugin {
                     deviceready();
                 } else if (action.equals("createChannel")) {
                     createChannel(args, callbackContext);
+                } else if (action.equals("createChannelGroup")) {
+                    createChannelGroup(args, callbackContext);
+                } else if (action.equals("getChannelGroup")) {
+                    getChannelGroup(args, callbackContext);
+                } else if (action.equals("deleteChannelGroup")) {
+                    deleteChannelGroup(args, callbackContext);
                 } else if (action.equals("getChannel")) {
                     getChannel(args, callbackContext);
                 } else if (action.equals("deleteChannel")) {
@@ -345,8 +351,70 @@ public class LocalNotification extends CordovaPlugin {
      *                JavaScript.
      */
     private void createChannel(JSONArray args, CallbackContext callbackContext) {
-        Manager.createChannel(getContext(), new Options(getContext(), args.optJSONObject(0)));
-        callbackContext.success();
+        try {
+            Manager.createChannel(getContext(), new Options(getContext(), args.optJSONObject(0)));
+            callbackContext.success();
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Could not create notification channel", e);
+            callbackContext.error(e.getMessage());
+        }
+    }
+
+    /** Create or update a group without overriding the user's blocked state. */
+    private void createChannelGroup(JSONArray args, CallbackContext callbackContext) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            successBoolean(callbackContext, false);
+            return;
+        }
+        JSONObject options = args.optJSONObject(0);
+        if (options == null || options.optString("id").isEmpty() || options.optString("name").isEmpty()) {
+            callbackContext.error("Channel group requires id and name");
+            return;
+        }
+        NotificationChannelGroup group = new NotificationChannelGroup(options.optString("id"), options.optString("name"));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            group.setDescription(options.optString("description", null));
+        }
+        NotificationManagerCompat.from(getContext()).createNotificationChannelGroup(group);
+        successBoolean(callbackContext, true);
+    }
+
+    /** Read current group settings; querying a missing group has no side effects. */
+    private void getChannelGroup(JSONArray args, CallbackContext callbackContext) {
+        NotificationChannelGroup group = null;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            group = NotificationManagerCompat.from(getContext()).getNotificationChannelGroup(args.optString(0));
+        }
+        if (group == null) {
+            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, (String) null));
+            return;
+        }
+        try {
+            JSONObject result = new JSONObject();
+            result.put("id", group.getId());
+            result.put("name", group.getName().toString());
+            String description = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ? group.getDescription() : null;
+            result.put("description", description == null ? JSONObject.NULL : description);
+            result.put("blocked", Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && group.isBlocked());
+            JSONArray channelIds = new JSONArray();
+            for (NotificationChannel channel : group.getChannels()) {
+                channelIds.put(channel.getId());
+            }
+            result.put("channelIds", channelIds);
+            callbackContext.success(result);
+        } catch (JSONException e) {
+            callbackContext.error("Could not read notification channel group: " + e.getMessage());
+        }
+    }
+
+    /** Android also deletes the channels belonging to the deleted group. */
+    private void deleteChannelGroup(JSONArray args, CallbackContext callbackContext) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            successBoolean(callbackContext, false);
+            return;
+        }
+        NotificationManagerCompat.from(getContext()).deleteNotificationChannelGroup(args.optString(0));
+        successBoolean(callbackContext, true);
     }
 
     /**

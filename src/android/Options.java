@@ -450,6 +450,11 @@ public final class Options {
         return options.optLong("androidTimeoutAfter", 0);
     }
 
+    /** Channel group ID, or null for an ungrouped channel. Since Android 8. */
+    public String getAndroidChannelGroupId() {
+        return options.optString("androidChannelGroupId", null);
+    }
+
     /**
      * Since Android 8. The channel id of that notification.
      * Defaults to 'default_channel' if not set.
