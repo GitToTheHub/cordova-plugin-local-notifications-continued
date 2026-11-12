@@ -43,7 +43,7 @@ The Promise API, channel query ([`getChannel()`](#getchannel)), `channel.enabled
 
 The examples use Promises with `async` / `await`. This syntax is supported from **Android WebView 55** and **iOS 10.3**, so it is covered by the plugin's minimum versions above. On Android, JavaScript syntax support depends on the installed WebView version, not just the Android version. See [MDN: await compatibility](https://github.com/mdn/browser-compat-data/blob/main/javascript/operators/await.json) and [WebKit: Safari 10.1 and iOS 10.3](https://webkit.org/blog/7477/new-web-features-in-safari-10-1/).
 
-Use `await` inside an `async` function, as shown in [Quick Start](#basics). Using `await` inside a function without `async`, or directly in a regular `<script>`, causes a JavaScript `SyntaxError`. Top-level `await` is supported in JavaScript modules (`<script type="module">`) on newer versions, but has different compatibility requirements and is not required by these examples.
+Use `await` inside an `async` function, as shown in [Quick Start](#basics). The examples do not require top-level `await` (outside a function), which has different compatibility requirements.
 
 ### Installation
 
@@ -90,7 +90,7 @@ cordova plugin add https://github.com/GitToTheHub/cordova-plugin-local-notificat
 <a id="basics"></a>
 ## Quick Start
 
-Wait for Cordova's `deviceready` event before using `cordova.plugins.notification.local`. The Quick Start shows the complete event handler. The later examples show code to place inside an existing `async` function or `async` event handler after `deviceready`; do not paste `await` directly into a regular script.
+Wait for Cordova's `deviceready` event before using `cordova.plugins.notification.local`.
 Check the current notification permission before scheduling so your app can respond if notifications are disabled. Users can revoke permission in system settings at any time; do not assume that an earlier grant still applies. This example uses [`requestPermission()`](#requestpermission) to check the current app-level permission and request it when the system allows a prompt.
 
 ```js
@@ -129,62 +129,82 @@ Give each notification a unique numeric [`id`](#property-id). If omitted, the ID
 Without a [`trigger`](#triggers), the plugin requests immediate delivery:
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 2,
-        title: 'Ready now',
-        text: 'Your download is complete.'
-    });
-} catch (error) {
-    console.error(error);
+async function quickStartExample() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 2,
+            title: 'Ready now',
+            text: 'Your download is complete.'
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+quickStartExample();
 ```
 
 To schedule several notifications, pass an array:
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule([
-        { id: 3, title: 'First reminder', trigger: { in: 1, unit: 'minute' } },
-        { id: 4, title: 'Second reminder', trigger: { in: 2, unit: 'minute' } }
-    ]);
-} catch (error) {
-    console.error(error);
+async function quickStartExample2() {
+    try {
+        await cordova.plugins.notification.local.schedule([
+            { id: 3, title: 'First reminder', trigger: { in: 1, unit: 'minute' } },
+            { id: 4, title: 'Second reminder', trigger: { in: 2, unit: 'minute' } }
+        ]);
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+quickStartExample2();
 ```
 
 ### Check Android Notification Settings
 
-On Android 8 and newer, users can disable notifications for the entire app, an individual channel, or a channel group. For an existing channel, [`getChannel()`](#getchannel) combines these settings in `channel.enabled`:
+Use this check when revisiting notification settings, for example after the app resumes. It checks a channel your app already uses. This example assumes that the [Quick Start](#basics) has successfully scheduled a notification and created `default_channel`. If your app uses a custom channel, use that existing channel's [`androidChannelId`](#property-androidchannelid) instead.
+
+Android 7 has no notification channels, so only app-level settings are checked there. On Android 8 and newer, [`getChannel()`](#getchannel) combines app-level and channel-level blocking in `channel.enabled`. On Android 9 and newer, it also includes channel-group blocking.
 
 ```js
 try {
-    // Run after deviceready, for example when refreshing reminder settings.
-    if (cordova.platformId === 'android') {
-        const channel = await cordova.plugins.notification.local.getChannel('default_channel');
-        if (channel === null) {
-            console.log('No channel settings are available yet.');
-            return;
-        }
+    // Run inside an async function after deviceready.
+    if (cordova.platformId !== 'android') return;
 
-        if (!channel.enabled) {
-            console.log('Notifications are disabled. Please check Android notification settings.');
-            return;
-        }
+    const notifications = cordova.plugins.notification.local;
+    const androidVersion = parseInt(device.version, 10);
 
-        console.log('Notifications are enabled for this channel.');
+    if (androidVersion < 8) {
+        const enabled = await notifications.hasPermission();
+        console.log('Android 7 app notifications enabled:', enabled);
+        return;
     }
+
+    // The default channel was created by the Quick Start notification.
+    const channelId = 'default_channel';
+    const channel = await notifications.getChannel(channelId);
+    if (channel === null) {
+        console.warn('Expected an existing channel. Check the channel ID and notification setup:', channelId);
+        return;
+    }
+
+    if (!channel.enabled) {
+        console.log('Notifications are blocked by app, channel, or channel-group settings. Please review Android notification settings.');
+        return;
+    }
+
+    console.log('Notifications are enabled for this channel.');
 } catch (error) {
     console.error(error);
 }
 ```
 
-Use the channel ID your notifications actually use: `default_channel` if you leave the defaults unchanged, or your own [`androidChannelId`](#property-androidchannelid).
+The version check uses `device.version` from `cordova-plugin-device`, a dependency of this plugin. Read it after `deviceready`.
 
-- A channel is available when app notifications are enabled and neither the channel nor its group is blocked. This does not guarantee sound, exact timing, or delivery in every device mode.
-- **`channel === null`:** the channel has not been created, was deleted, or channels are unsupported (Android 7). This is not a permission decision; [`schedule()`](#schedule) can create a missing channel. Check app-level permission separately with [`requestPermission()`](#requestpermission) or [`hasPermission()`](#haspermission).
+**A missing channel is not a permission result.** In Android's notification settings, users can disable individual channels, but cannot delete them. A disabled channel still exists and returns `enabled: false`. In this example, `null` therefore indicates an unexpected missing channel: check the ID, whether the initial scheduling completed, or whether your app deleted the channel with [`deleteChannel()`](#deletechannel). Do not treat `null` as permission denial or ask the user to grant permission because of it.
 
-[`hasPermission()`](#haspermission) checks only whether notifications are enabled for the app and also works on iOS. [`getChannel()`](#getchannel) also checks whether the selected Android channel or its channel group blocks notifications. Its `appNotificationsEnabled` field repeats the same app-level status that [`hasPermission()`](#haspermission) returns on Android, so you do not need a second call just to read that status for an existing channel. The detailed fields `blocked` and `groupBlocked` are available when you need to explain the specific reason; see [getChannel](#getchannel).
+`channel.enabled` includes the app-level status, so a separate [`hasPermission()`](#haspermission) call is unnecessary on Android 8 and newer. The fields `appNotificationsEnabled`, `blocked`, and `groupBlocked` explain the individual reasons; see [getChannel](#getchannel). An enabled channel does not guarantee sound, exact timing, or delivery in every device mode. Offer [openNotificationSettings](#opennotificationsettings) when the user wants to change their settings.
 
 ## Notification Examples
 
@@ -195,23 +215,27 @@ Run these examples after `deviceready`. Each example is independent. They show c
 This example uses properties supported on both Android and iOS:
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 10,
-        title: 'Appointment reminder',
-        text: 'Your appointment starts in 30 minutes.',
-        trigger: { in: 30, unit: 'minute' },
-        sound: 'default',
-        launch: true,
-        data: { appointmentId: 'appointment-42' }
-    });
+async function sharedOptionsExampleExample() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 10,
+            title: 'Appointment reminder',
+            text: 'Your appointment starts in 30 minutes.',
+            trigger: { in: 30, unit: 'minute' },
+            sound: 'default',
+            launch: true,
+            data: { appointmentId: 'appointment-42' }
+        });
 
-    cordova.plugins.notification.local.on('click', (notification) => {
-        console.log('Open appointment:', notification.data.appointmentId);
-    });
-} catch (error) {
-    console.error(error);
+        cordova.plugins.notification.local.on('click', (notification) => {
+            console.log('Open appointment:', notification.data.appointmentId);
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+sharedOptionsExampleExample();
 ```
 
 `data` carries your own application data; it is not displayed in the notification. Use it to decide what to open when the user taps the notification. See [common properties](#common-properties), [triggers](#triggers), and [events](#events).
@@ -221,32 +245,36 @@ try {
 Combine shared content and conditional platform options in a single [`schedule()`](#schedule) call. Object spread (`...`) includes only the options for the current platform:
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 15,
-        title: 'Appointment reminder',
-        text: 'Your appointment starts in 30 minutes.',
-        trigger: { in: 30, unit: 'minute' },
-        sound: 'default',
-        launch: true,
-        data: { appointmentId: 'appointment-42' },
+async function oneNotificationWithPlatformSpecificOptionsExample() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 15,
+            title: 'Appointment reminder',
+            text: 'Your appointment starts in 30 minutes.',
+            trigger: { in: 30, unit: 'minute' },
+            sound: 'default',
+            launch: true,
+            data: { appointmentId: 'appointment-42' },
 
-        ...(cordova.platformId === 'android' ? {
-            androidChannelId: 'appointment_reminders',
-            androidChannelName: 'Appointment reminders',
-            androidChannelImportance: 'IMPORTANCE_DEFAULT',
-            androidAutoCancel: true,
-            androidColor: '#1565C0'
-        } : {}),
+            ...(cordova.platformId === 'android' ? {
+                androidChannelId: 'appointment_reminders',
+                androidChannelName: 'Appointment reminders',
+                androidChannelImportance: 'IMPORTANCE_DEFAULT',
+                androidAutoCancel: true,
+                androidColor: '#1565C0'
+            } : {}),
 
-        ...(cordova.platformId === 'ios' ? {
-            iOSForeground: true,
-            badgeNumber: 1
-        } : {})
-    });
-} catch (error) {
-    console.error(error);
+            ...(cordova.platformId === 'ios' ? {
+                iOSForeground: true,
+                badgeNumber: 1
+            } : {})
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+oneNotificationWithPlatformSpecificOptionsExample();
 ```
 
 > [!NOTE]
@@ -421,22 +449,26 @@ You can add actions to a notification, which can be a button or an input.
 Before you can use them you have to create an action group with some actions.
 
 ```js
-try {
-    // Creates an action group with the id 'YES_NO_CATEGORY' and two actions.
-    await cordova.plugins.notification.local.addActions('YES_NO_CATEGORY', [
-        {
-            id: 'YES_ACTION', // Action id
-            title: 'Yes', // Action button title
-            launch: true // Click on action will open the app
-        },
-        {
-            id: 'NO_ACTION',
-            title: 'No'
-        }
-    ]);
-} catch (error) {
-    console.error(error);
+async function actionsExample() {
+    try {
+        // Creates an action group with the id 'YES_NO_CATEGORY' and two actions.
+        await cordova.plugins.notification.local.addActions('YES_NO_CATEGORY', [
+            {
+                id: 'YES_ACTION', // Action id
+                title: 'Yes', // Action button title
+                launch: true // Click on action will open the app
+            },
+            {
+                id: 'NO_ACTION',
+                title: 'No'
+            }
+        ]);
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+actionsExample();
 ```
 
 To see which properties can be set see [Action properties](#action-properties).
@@ -450,16 +482,20 @@ If the `type` of an action is not set, it defaults to `button`.
 After the action group is defined, you can assign it to a notification:
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 1,
-        title: 'Justin Rhyss',
-        text: 'Do you want to go see a movie tonight?',
-        actions: 'YES_NO_CATEGORY'
-    });
-} catch (error) {
-    console.error(error);
+async function actionsExample2() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 1,
+            title: 'Justin Rhyss',
+            text: 'Do you want to go see a movie tonight?',
+            actions: 'YES_NO_CATEGORY'
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+actionsExample2();
 ```
 
 <p style="text-align: center;">
@@ -474,23 +510,27 @@ On iOS the actions are not visible by default. You have to long press on the not
 Create an action group with an action input:
 
 ```js
-try {
-    await cordova.plugins.notification.local.addActions('REPLY_NO_CATEGORY', [
-        {
-            id: 'REPLY_ACTION',
-            type: 'input',
-            title: 'Reply',
-            emptyText: 'Type message',
-            launch: true // Will open the app
-        },
-        {
-            id: 'NO_ACTION',
-            title: 'No'
-        }
-    ]);
-} catch (error) {
-    console.error(error);
+async function actionInputExample() {
+    try {
+        await cordova.plugins.notification.local.addActions('REPLY_NO_CATEGORY', [
+            {
+                id: 'REPLY_ACTION',
+                type: 'input',
+                title: 'Reply',
+                emptyText: 'Type message',
+                launch: true // Will open the app
+            },
+            {
+                id: 'NO_ACTION',
+                title: 'No'
+            }
+        ]);
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+actionInputExample();
 ```
 
 To see which properties can be set for an action input see [Action properties](#action-properties).
@@ -498,16 +538,20 @@ To see which properties can be set for an action input see [Action properties](#
 Schedule notification with the defined action group:
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 1,
-        title: 'Justin Rhyss',
-        text: 'Do you want to go see a movie tonight?',
-        actions: 'REPLY_NO_CATEGORY'
-    });
-} catch (error) {
-    console.error(error);
+async function actionInputExample2() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 1,
+            title: 'Justin Rhyss',
+            text: 'Do you want to go see a movie tonight?',
+            actions: 'REPLY_NO_CATEGORY'
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+actionInputExample2();
 ```
 
 | iOS          | Android      |
@@ -570,16 +614,20 @@ Notifications may trigger immediately or depend on calendar or location.
 Trigger at a fixed date:
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 1,
-        title: 'Design team meeting',
-        text: '3:00 - 4:00 PM',
-        trigger: { at: new Date(Date.now() + 60 * 60 * 1000) }
-    });
-} catch (error) {
-    console.error(error);
+async function fixedDateExample() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 1,
+            title: 'Design team meeting',
+            text: '3:00 - 4:00 PM',
+            trigger: { at: new Date(Date.now() + 60 * 60 * 1000) }
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+fixedDateExample();
 ```
 
 | Property      | Type    | Value            | Android | iOS |
@@ -590,15 +638,19 @@ try {
 Relative from now:
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 1,
-        title: 'Design team meeting',
-        trigger: { in: 1, unit: 'hour' }
-    });
-} catch (error) {
-    console.error(error);
+async function relativeExample() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 1,
+            title: 'Design team meeting',
+            trigger: { in: 1, unit: 'hour' }
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+relativeExample();
 ```
 
 | Property      | Type    | Value            | Android | iOS |
@@ -611,15 +663,19 @@ try {
 Repeat relative from now:
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 1,
-        title: 'Design team meeting',
-        trigger: { every: 'day', count: 5 } // count is only supported by Android
-    });
-} catch (error) {
-    console.error(error);
+async function repeatingExample() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 1,
+            title: 'Design team meeting',
+            trigger: { every: 'day', count: 5 } // count is only supported by Android
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+repeatingExample();
 ```
 
 | Property      | Type    | Value            | Android | iOS | Note |
@@ -632,15 +688,19 @@ try {
 Trigger every time the date matches:
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 1,
-        title: 'Happy Birthday!!!',
-        trigger: { every: { month: 10, day: 27, hour: 9, minute: 0 } }
-    });
-} catch (error) {
-    console.error(error);
+async function repeatingExample2() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 1,
+            title: 'Happy Birthday!!!',
+            trigger: { every: { month: 10, day: 27, hour: 9, minute: 0 } }
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+repeatingExample2();
 ```
 
 | Property      | Type    | Value            | Android | iOS | Note |
@@ -656,20 +716,24 @@ try {
 To trigger when the user enters a region:
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 1,
-        title: 'Welcome to our office',
-        trigger: {
-            type: 'location',
-            center: [x, y],
-            radius: 15,
-            notifyOnEntry: true
-        }
-    });
-} catch (error) {
-    console.error(error);
+async function locationBasedExample() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 1,
+            title: 'Welcome to our office',
+            trigger: {
+                type: 'location',
+                center: [x, y],
+                radius: 15,
+                notifyOnEntry: true
+            }
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+locationBasedExample();
 ```
 
 | Property      | Type    | Value            | Android | iOS | Note |
@@ -686,20 +750,24 @@ try {
 Notifications can include an animated progress indicator that shows users the status of an ongoing operation.
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 1,
-        title: 'Sync in progress',
-        text: 'Copied 2 of 10 files',
-        androidProgressBar: {
-            value: 20, // Default 0
-            maxValue: 100, // Default 100
-            indeterminate: false // Default false
-        }
-    });
-} catch (error) {
-    console.error(error);
+async function progressExample() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 1,
+            title: 'Sync in progress',
+            text: 'Copied 2 of 10 files',
+            androidProgressBar: {
+                value: 20, // Default 0
+                maxValue: 100, // Default 100
+                indeterminate: false // Default false
+            }
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+progressExample();
 ```
 
 <p style="text-align: center;">
@@ -726,17 +794,21 @@ See [ProgressBar#determinate-progress](https://developer.android.com/reference/a
 Split the text by line breaks if the message comes from a single person and just too long to show in a single line.
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 1,
-        title: 'The Big Meeting',
-        text: '4:15 - 5:15 PM\nBig Conference Room',
-        androidSmallIcon: 'res://ic_menu_my_calendar',
-        androidLargeIcon: 'res://large_icon'
-    });
-} catch (error) {
-    console.error(error);
+async function patternsExample() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 1,
+            title: 'The Big Meeting',
+            text: '4:15 - 5:15 PM\nBig Conference Room',
+            androidSmallIcon: 'res://ic_menu_my_calendar',
+            androidLargeIcon: 'res://large_icon'
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+patternsExample();
 ```
 
 <p style="text-align: center;">
@@ -749,20 +821,24 @@ try {
 Instead of displaying multiple notifications, you can create one notification that summarizes them all.
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 15,
-        title: 'Chat with Irish',
-        androidLargeIcon: 'res://large_icon',
-        androidMessages: [
-            { person: 'Me', message: 'I miss you' },
-            { person: 'Irish', message: 'I miss you more!' },
-            { person: 'Me', message: 'I always miss you more by 10%' }
-        ]
-    });
-} catch (error) {
-    console.error(error);
+async function summarizingExample() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 15,
+            title: 'Chat with Irish',
+            androidLargeIcon: 'res://large_icon',
+            androidMessages: [
+                { person: 'Me', message: 'I miss you' },
+                { person: 'Irish', message: 'I miss you more!' },
+                { person: 'Me', message: 'I always miss you more by 10%' }
+            ]
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+summarizingExample();
 ```
 
 <p style="text-align: center;">
@@ -772,14 +848,18 @@ try {
 To add a new message to the existing chat:
 
 ```js
-try {
-    await cordova.plugins.notification.local.update({
-        id: 15,
-        androidMessages: [{ person: 'Irish', message: 'Bye bye' }]
-    });
-} catch (error) {
-    console.error(error);
+async function summarizingExample2() {
+    try {
+        await cordova.plugins.notification.local.update({
+            id: 15,
+            androidMessages: [{ person: 'Irish', message: 'Bye bye' }]
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+summarizingExample2();
 ```
 
 For displaying the messages, [NotificationCompat.MessagingStyle](https://developer.android.com/reference/androidx/core/app/NotificationCompat.MessagingStyle) will be used.
@@ -813,37 +893,41 @@ Your app can present multiple notifications as a single group:
 - The child notifications are presented without duplicate header information.
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule([
-        {
-            id: 1,
-            title: 'Design team meeting',
-        },
-        {
-            id: 2,
-            androidSummary: 'me@gmail.com',
-            androidGroup: 'email',
-            androidGroupSummary: true
-        },
-        {
-            id: 3,
-            title: 'Please take all my money',
-            androidGroup: 'email'
-        },
-        {
-            id: 4,
-            title: 'A question regarding this plugin',
-            androidGroup: 'email'
-        },
-        {
-            id: 5,
-            title: 'Welcome back home',
-            androidGroup: 'email'
-        }
-    ]);
-} catch (error) {
-    console.error(error);
+async function groupingExample() {
+    try {
+        await cordova.plugins.notification.local.schedule([
+            {
+                id: 1,
+                title: 'Design team meeting',
+            },
+            {
+                id: 2,
+                androidSummary: 'me@gmail.com',
+                androidGroup: 'email',
+                androidGroupSummary: true
+            },
+            {
+                id: 3,
+                title: 'Please take all my money',
+                androidGroup: 'email'
+            },
+            {
+                id: 4,
+                title: 'A question regarding this plugin',
+                androidGroup: 'email'
+            },
+            {
+                id: 5,
+                title: 'Welcome back home',
+                androidGroup: 'email'
+            }
+        ]);
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+groupingExample();
 ```
 
 <p style="text-align: center;">
@@ -864,30 +948,34 @@ On Android 7, channel IDs do not select system channels; applicable sound, vibra
 Add your audio file to `www/audio/reminder.mp3` in your Cordova app, then rebuild the app so the file is packaged with it. Run this example after `deviceready`:
 
 ```js
-try {
-    if (cordova.platformId === 'android') {
-        const notifications = cordova.plugins.notification.local;
+async function androidChannelWithACustomSoundExample() {
+    try {
+        if (cordova.platformId === 'android') {
+            const notifications = cordova.plugins.notification.local;
 
-        const granted = await notifications.requestPermission();
-        if (!granted) {
-            console.log('Android: notification permission is denied.');
-            return;
+            const granted = await notifications.requestPermission();
+            if (!granted) {
+                console.log('Android: notification permission is denied.');
+                return;
+            }
+
+            await notifications.schedule({
+                id: 70,
+                title: 'Appointment reminder',
+                text: 'Your appointment starts soon.',
+                androidChannelId: 'reminders_custom_sound',
+                androidChannelName: 'Reminders',
+                androidChannelDescription: 'Appointment reminders with a custom sound',
+                sound: 'www/audio/reminder.mp3',
+                trigger: { in: 10, unit: 'second' }
+            });
         }
-
-        await notifications.schedule({
-            id: 70,
-            title: 'Appointment reminder',
-            text: 'Your appointment starts soon.',
-            androidChannelId: 'reminders_custom_sound',
-            androidChannelName: 'Reminders',
-            androidChannelDescription: 'Appointment reminders with a custom sound',
-            sound: 'www/audio/reminder.mp3',
-            trigger: { in: 10, unit: 'second' }
-        });
+    } catch (error) {
+        console.error(error);
     }
-} catch (error) {
-    console.error(error);
 }
+
+androidChannelWithACustomSoundExample();
 ```
 
 On Android 8 and newer, [`schedule()`](#schedule) creates the channel automatically if needed and sets its sound. The default importance is [`IMPORTANCE_DEFAULT`](#property-androidchannelimportance), so it does not need to be specified. Each notification selects that channel using the same [`androidChannelId`](#property-androidchannelid). The [`sound`](#property-sound) on the notification also supports Android 7, which has no channels.
@@ -903,30 +991,34 @@ Channel groups organize channels in Android's notification settings, for example
 Create a group first, then pass its ID as [`androidChannelGroupId`](#channel-groups) when creating a channel or scheduling a notification. Await group creation so the group exists before scheduling the notification:
 
 ```js
-try {
-    if (cordova.platformId === 'android') {
-        const notifications = cordova.plugins.notification.local;
+async function channelGroupsExample() {
+    try {
+        if (cordova.platformId === 'android') {
+            const notifications = cordova.plugins.notification.local;
 
-        const supported = await notifications.createChannelGroup({
-            id: 'household',
-            name: 'Household',
-            description: 'Reminders for this household'
-        });
-        if (!supported) return; // Channel groups require Android 8 or newer.
+            const supported = await notifications.createChannelGroup({
+                id: 'household',
+                name: 'Household',
+                description: 'Reminders for this household'
+            });
+            if (!supported) return; // Channel groups require Android 8 or newer.
 
-        await notifications.schedule({
-            id: 50,
-            title: 'Collection reminder',
-            text: 'Put out the recycling bin tonight.',
-            androidChannelId: 'recycling',
-            androidChannelName: 'Recycling',
-            androidChannelGroupId: 'household',
-            trigger: { in: 30, unit: 'minute' }
-        });
+            await notifications.schedule({
+                id: 50,
+                title: 'Collection reminder',
+                text: 'Put out the recycling bin tonight.',
+                androidChannelId: 'recycling',
+                androidChannelName: 'Recycling',
+                androidChannelGroupId: 'household',
+                trigger: { in: 30, unit: 'minute' }
+            });
+        }
+    } catch (error) {
+        console.error(error);
     }
-} catch (error) {
-    console.error(error);
 }
+
+channelGroupsExample();
 ```
 
 The group must already exist when using [`androidChannelGroupId`](#channel-groups). On Android 7 this property is ignored because channels and channel groups are unsupported. On iOS, omit Android-specific options.
@@ -959,16 +1051,20 @@ The default channel id was changed in version 1.1.0 from `default-channel-id` to
 A channel can be created directly when posting a notification:
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 1,
-        title: 'My first notification',
-        androidChannelId: "my_channel_01",
-        androidChannelName: "My Channel Name"
-    });
-} catch (error) {
-    console.error(error);
+async function createChannelByPostingANotificationExample() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 1,
+            title: 'My first notification',
+            androidChannelId: "my_channel_01",
+            androidChannelName: "My Channel Name"
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+createChannelByPostingANotificationExample();
 ```
 
 If you omit some channel properties the [default channel properties](#default-channel) will be used.
@@ -1051,26 +1147,30 @@ If you want to listen when an action was clicked or an input was made, you have 
 Example:
 
 ```js
-try {
-    // Define an action group with the action ids 'YES_ACTION' and 'NO_ACTION'
-    await cordova.plugins.notification.local.addActions('YES_NO_CATEGORY', [
-        {
-            id: 'YES_ACTION',
-            title: 'Yes'
-        },
-        {
-            id: 'NO_ACTION',
-            title: 'No'
-        }
-    ]);
+async function subscribeToAnActionEventExample() {
+    try {
+        // Define an action group with the action ids 'YES_ACTION' and 'NO_ACTION'
+        await cordova.plugins.notification.local.addActions('YES_NO_CATEGORY', [
+            {
+                id: 'YES_ACTION',
+                title: 'Yes'
+            },
+            {
+                id: 'NO_ACTION',
+                title: 'No'
+            }
+        ]);
 
-    // Subscribe to the action click event for 'YES_ACTION'
-    cordova.plugins.notification.local.on('YES_ACTION', (notification, event) => {
-        // yes action was clicked
-    });
-} catch (error) {
-    console.error(error);
+        // Subscribe to the action click event for 'YES_ACTION'
+        cordova.plugins.notification.local.on('YES_ACTION', (notification, event) => {
+            // yes action was clicked
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+subscribeToAnActionEventExample();
 ```
 
 __Note:__
@@ -1145,36 +1245,42 @@ Most methods that communicate with the native platform are asynchronous. Use `aw
 [`getDefaults()`](#getdefaults) returns a value synchronously. [`setDefaults()`](#setdefaults), [`on()`](#methods), and [`un()`](#methods) also operate in JavaScript without a native completion callback.
 
 ```js
-try {
-    const notifications = cordova.plugins.notification.local;
+async function methodsExample() {
+    try {
+        const notifications = cordova.plugins.notification.local;
 
-    const pending = await notifications.getScheduled();
-    console.log('Pending notifications:', pending);
+        const pending = await notifications.getScheduled();
+        console.log('Pending notifications:', pending);
 
-    await notifications.cancel(10);
-    console.log('Notification 10 canceled.');
-} catch (error) {
-    console.error(error);
+        await notifications.cancel(10);
+        console.log('Notification 10 canceled.');
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+methodsExample();
 ```
 
 Asynchronous methods return a Promise when called without callbacks. Use `await` inside an `async` function and handle failures with `try` / `catch`:
 
 ```js
-const notifications = cordova.plugins.notification.local;
-try {
-    if (!await notifications.requestPermission()) {
-        console.log('Notification permission was denied.');
-        return;
+async function scheduleReminder() {
+    const notifications = cordova.plugins.notification.local;
+    try {
+        if (!await notifications.requestPermission()) {
+            console.log('Notification permission was denied.');
+            return;
+        }
+        await notifications.schedule({
+            id: 1,
+            title: 'Appointment reminder',
+            text: 'Your appointment starts soon.',
+            trigger: { in: 10, unit: 'minute' }
+        });
+    } catch (error) {
+        console.error('Could not schedule the reminder:', error);
     }
-    await notifications.schedule({
-        id: 1,
-        title: 'Appointment reminder',
-        text: 'Your appointment starts soon.',
-        trigger: { in: 10, unit: 'minute' }
-    });
-} catch (error) {
-    console.error('Could not schedule the reminder:', error);
 }
 ```
 
@@ -1261,21 +1367,25 @@ To post a notification to this channel, pass its [androidChannelId](#property-an
 Channel configuration example:
 
 ```js
-try {
-    await cordova.plugins.notification.local.createChannel({
-        androidChannelId: "my_channel_01", // string, to separate something in the id, use "_" instead of "-"
-        androidChannelName: "My Channel Name", // string, defaults to "Default Channel"
-        androidChannelDescription: "Description of channel", // string (optional)
-        androidChannelImportance: "IMPORTANCE_DEFAULT", // string (optional)
-        androidChannelEnableLights: true, // boolean (optional), default is false
-        androidChannelEnableVibration: true, // boolean (optional), default is false
-        sound: 'www/audio/ring.mp3', // string (optional)
-        androidChannelSoundUsage: 5 // int (optional), default is USAGE_NOTIFICATION
-    });
-    console.log('Channel creation completed.');
-} catch (error) {
-    console.error(error);
+async function createchannelExample() {
+    try {
+        await cordova.plugins.notification.local.createChannel({
+            androidChannelId: "my_channel_01", // string, to separate something in the id, use "_" instead of "-"
+            androidChannelName: "My Channel Name", // string, defaults to "Default Channel"
+            androidChannelDescription: "Description of channel", // string (optional)
+            androidChannelImportance: "IMPORTANCE_DEFAULT", // string (optional)
+            androidChannelEnableLights: true, // boolean (optional), default is false
+            androidChannelEnableVibration: true, // boolean (optional), default is false
+            sound: 'www/audio/ring.mp3', // string (optional)
+            androidChannelSoundUsage: 5 // int (optional), default is USAGE_NOTIFICATION
+        });
+        console.log('Channel creation completed.');
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+createchannelExample();
 ```
 
 Await the returned Promise when the next operation depends on channel creation having completed. You do not need a separate [`createChannel()`](#createchannel) call when scheduling: [`schedule()`](#schedule) creates the selected channel automatically if needed, as shown in the [combined platform example](#one-notification-with-platform-specific-options).
@@ -1306,15 +1416,19 @@ See [Channel Groups](#channel-groups) for a complete example. Native failures re
 Android 8 and newer. Reads a group's current settings without creating or changing it.
 
 ```js
-try {
-    const group = await cordova.plugins.notification.local.getChannelGroup('household');
-    if (group === null) return;
-    console.log('Group:', group.name);
-    console.log('Blocked:', group.blocked);
-    console.log('Channel IDs:', group.channelIds);
-} catch (error) {
-    console.error(error);
+async function getchannelgroupExample() {
+    try {
+        const group = await cordova.plugins.notification.local.getChannelGroup('household');
+        if (group === null) return;
+        console.log('Group:', group.name);
+        console.log('Blocked:', group.blocked);
+        console.log('Channel IDs:', group.channelIds);
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+getchannelgroupExample();
 ```
 
 Promise signature: `getChannelGroup(groupId)`. `groupId` must be a non-empty string. The Promise resolves to `null` for a missing or deleted group, on Android 7, or on iOS. Otherwise it receives:
@@ -1335,12 +1449,16 @@ Native failures reject the Promise. See [Callback Compatibility](#callback-compa
 Android 8 and newer. **Deletes the group and all channels belonging to it.** This can remove their posted notifications. Pending notification schedules are not canceled; cancel or update them separately when removing a group your reminders use.
 
 ```js
-try {
-    const supported = await cordova.plugins.notification.local.deleteChannelGroup('household');
-    if (supported) console.log('Group and its channels deleted.');
-} catch (error) {
-    console.error(error);
+async function deletechannelgroupExample() {
+    try {
+        const supported = await cordova.plugins.notification.local.deleteChannelGroup('household');
+        if (supported) console.log('Group and its channels deleted.');
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+deletechannelgroupExample();
 ```
 
 Promise signature: `deleteChannelGroup(groupId)`. `groupId` must be a non-empty string. Deleting an unknown group has no effect. The Promise resolves to `true` on Android 8 and newer, or `false` on Android 7 and iOS. Native failures reject the Promise. See [Callback Compatibility](#callback-compatibility) for older calls.
@@ -1351,23 +1469,27 @@ Promise signature: `deleteChannelGroup(groupId)`. `groupId` must be a non-empty 
 Android 8 and newer. Reads the current system settings of a notification channel, including changes made by the user. This method does not create, restore, or modify a channel.
 
 ```js
-try {
-    const channel = await cordova.plugins.notification.local.getChannel('appointment_reminders');
-    if (channel === null) {
-        // The channel does not exist yet, was deleted, or channels are unsupported.
-        // schedule() can create it when needed. This does not mean permission was denied.
-        return;
-    }
+async function getchannelExample() {
+    try {
+        const channel = await cordova.plugins.notification.local.getChannel('appointment_reminders');
+        if (channel === null) {
+            // The channel does not exist yet, was deleted, or channels are unsupported.
+            // schedule() can create it when needed. This does not mean permission was denied.
+            return;
+        }
 
-    if (!channel.enabled) {
-        console.log('Notifications are disabled for the app, channel, or channel group.');
-    } else {
-        console.log('Channel importance:', channel.importance);
-        console.log('Configured sound:', channel.sound);
+        if (!channel.enabled) {
+            console.log('Notifications are disabled for the app, channel, or channel group.');
+        } else {
+            console.log('Channel importance:', channel.importance);
+            console.log('Configured sound:', channel.sound);
+        }
+    } catch (error) {
+        console.error(error);
     }
-} catch (error) {
-    console.error(error);
 }
+
+getchannelExample();
 ```
 
 Promise signature: `getChannel(channelId)`. `channelId` must be a non-empty string. Native failures reject the Promise. See [Callback Compatibility](#callback-compatibility) for older calls.
@@ -1406,12 +1528,16 @@ Deletes an Android notification channel by ID.
 Example:
 
 ```js
-try {
-    await cordova.plugins.notification.local.deleteChannel('my_channel_id');
-    console.log('Channel deletion completed.');
-} catch (error) {
-    console.error(error);
+async function deletechannelExample() {
+    try {
+        await cordova.plugins.notification.local.deleteChannel('my_channel_id');
+        console.log('Channel deletion completed.');
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+deletechannelExample();
 ```
 
 Deleting a channel also removes its associated notifications. If you create a new channel with the same id, the deleted channel will be un-deleted with all of the same settings it had before it was deleted, see [NotificationManagerCompat.deleteNotificationChannel](https://developer.android.com/reference/androidx/core/app/NotificationManagerCompat#deleteNotificationChannel(java.lang.String))
@@ -1433,21 +1559,25 @@ Returns the status of unused app restrictions also called [app hibernation](#app
 Sample:
 
 ```js
-try {
-    await cordova.plugins.notification.local.getUnusedAppRestrictionsStatus(
-        (status) => {
-            // Shortcode for getting possibile status codes for status
-            const statusCodes = cordova.plugins.notification.local.androidUnusedAppRestrictionsStatusCodes;
+async function getunusedapprestrictionsstatusExample() {
+    try {
+        await cordova.plugins.notification.local.getUnusedAppRestrictionsStatus(
+            (status) => {
+                // Shortcode for getting possibile status codes for status
+                const statusCodes = cordova.plugins.notification.local.androidUnusedAppRestrictionsStatusCodes;
 
-            // app hibernation is active on Android 12 and later
-            if (status == statusCodes.API_31) {
+                // app hibernation is active on Android 12 and later
+                if (status == statusCodes.API_31) {
 
+                }
             }
-        }
-    );
-} catch (error) {
-    console.error(error);
+        );
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+getunusedapprestrictionsstatusExample();
 ```
 
 Possible status codes:
@@ -1465,12 +1595,16 @@ Possible status codes:
 Checks if the app has permissions to post notifications.
 
 ```js
-try {
-    const granted = await cordova.plugins.notification.local.hasPermission();
-    console.log('App notification permission:', granted);
-} catch (error) {
-    console.error(error);
+async function haspermissionExample() {
+    try {
+        const granted = await cordova.plugins.notification.local.hasPermission();
+        console.log('App notification permission:', granted);
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+haspermissionExample();
 ```
 
 ### iOSClearBadge
@@ -1497,12 +1631,16 @@ Opens the unused app restriction settings directly in your app. The Promise reso
 Sample:
 
 ```js
-try {
-    const result = await cordova.plugins.notification.local.openManageUnusedAppRestrictions();
-    // User has returned from the settings
-} catch (error) {
-    console.error(error);
+async function openmanageunusedapprestrictionsExample() {
+    try {
+        const result = await cordova.plugins.notification.local.openManageUnusedAppRestrictions();
+        // User has returned from the settings
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+openmanageunusedapprestrictionsExample();
 ```
 
 After awaiting this method, check the current status with [getUnusedAppRestrictionsStatus](#getunusedapprestrictionsstatus).
@@ -1517,12 +1655,16 @@ Opens the notifications settings of the app on Android 8 and newer. This method 
 Request permission to post notifications. This is called automatically by the plugin when scheduling notifications, but you can also request it manually before scheduling notifications:
 
 ```js
-try {
-    const granted = await cordova.plugins.notification.local.requestPermission();
-    console.log('App notification permission:', granted);
-} catch (error) {
-    console.error(error);
+async function requestpermissionExample() {
+    try {
+        const granted = await cordova.plugins.notification.local.requestPermission();
+        console.log('App notification permission:', granted);
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+requestpermissionExample();
 ```
 
 The system may show a permission dialog, depending on the platform and the user's previous choice. The Promise resolves to `true` when permission is granted, or `false` when it is denied. Native errors reject the Promise.
@@ -1865,16 +2007,20 @@ Example folded and unfolded:
 ##### Code Example
 
 ```js
-try {
-    await cordova.plugins.notification.local.schedule({
-        id: 1,
-        title: 'Get a fan!',
-        text: 'RB Leipzig is looking for a new fan! Click here to apply!',
-        attachments: ['www/img/rb-leipzig.png']
-    });
-} catch (error) {
-    console.error(error);
+async function codeExampleExample() {
+    try {
+        await cordova.plugins.notification.local.schedule({
+            id: 1,
+            title: 'Get a fan!',
+            text: 'RB Leipzig is looking for a new fan! Click here to apply!',
+            attachments: ['www/img/rb-leipzig.png']
+        });
+    } catch (error) {
+        console.error(error);
+    }
 }
+
+codeExampleExample();
 ```
 
 #### Property `badgeNumber`
