@@ -4,6 +4,8 @@
 
 **Features:**
 
+- feat: return Promises from asynchronous methods called without callbacks, preserving the existing callback API.
+
 - feat(android): add `getChannel()` to read notification channel settings ([#10](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/10))
 - feat(android): add `channel.enabled` to check whether app, channel, or group settings block notifications ([#12](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/12))
 - feat(android): support notification channel groups ([#13](https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued/pull/13))

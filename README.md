@@ -1057,11 +1057,37 @@ notifications.cancel(10, () => {
 });
 ```
 
+Asynchronous methods return a Promise when called without callbacks. Use `await` inside an `async` function and handle failures with `try` / `catch`:
+
+```js
+async function scheduleReminder() {
+    const notifications = cordova.plugins.notification.local;
+    try {
+        if (!await notifications.requestPermission()) {
+            console.log('Notification permission was denied.');
+            return;
+        }
+        await notifications.schedule({
+            id: 1,
+            title: 'Appointment reminder',
+            text: 'Your appointment starts soon.',
+            trigger: { in: 10, unit: 'minute' }
+        });
+    } catch (error) {
+        console.error('Could not schedule the reminder:', error);
+    }
+}
+```
+
+The Promise fulfills with the same value as the success callback. Native failures and JavaScript validation errors reject it. Permission denial (`false`) and missing channels (`null`) are normal fulfilled results. `get()` without arguments returns all notifications. For scheduling options, use `schedule(options, { skipPermission: true })` or `update(options, { skipPermission: true })`.
+
+Synchronous methods such as [`getDefaults()`](#getdefaults) and [`setDefaults()`](#setdefaults), and event registration through `on()` / `un()`, keep their existing behavior. Supplying a callback keeps the callback API and its return value; object scopes remain supported. A custom Promise wrapper that only passes a success callback still needs its own rejection handler, or can be replaced by the plugin's Promise API.
+
 Native methods accept an optional success callback followed by an error callback. Existing object arguments such as `this` in the former callback-scope position remain supported. Event listeners registered with `on()` retain their callback scope.
 
-The error callback receives native failures. Without one, the plugin logs the error to the JavaScript console. Success callbacks do not run on failure. On iOS, scheduling and updating wait for the native completion handlers; a batch stops at its first failed request, without rolling back earlier successful requests. Authorization errors reach the error callback, while an ordinary permission denial remains a successful `false` result. Promise wrappers that only resolve from a success callback remain pending on native failure; supply a rejection handler if the app needs to recover. Permission denial (`false`) and missing channels (`null`) remain normal success results.
+The error callback receives native failures. In callback mode, omitting the error callback logs failures to the JavaScript console. In Promise mode, handle rejections with `catch` or `try` / `catch` around `await`. Success callbacks do not run on failure. On iOS, scheduling and updating wait for the native completion handlers; a batch stops at its first failed request, without rolling back earlier successful requests. Authorization errors reach the error callback, while an ordinary permission denial remains a successful `false` result. Promise wrappers that only resolve from a success callback remain pending on native failure; supply a rejection handler if the app needs to recover. Permission denial (`false`) and missing channels (`null`) remain normal success results.
 
-For `schedule()` and `update()`, the argument order is `options, successCallback, errorCallback, args`; legacy scope objects in the third position remain supported.
+In callback mode, for `schedule()` and `update()`, the argument order is `options, successCallback, errorCallback, args`; legacy scope objects in the third position remain supported.
 
 In the table, **pending** means scheduled for future delivery; **delivered** means already posted by the system. `x` indicates platform support and `—` means the method is platform-specific.
 
