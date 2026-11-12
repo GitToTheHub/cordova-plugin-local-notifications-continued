@@ -1,4 +1,4 @@
-# Cordova Plugin Local Notifications &gt;&gt; *Continued*</div>
+# Cordova Plugin Local Notifications — Continued
 
 <img src="images/logo.png" height="100">
 
@@ -11,25 +11,32 @@
 > [!NOTE]
 > Since plugin version 1.2.4 (28th August 2026) this plugin will be continued to be maintained here. The original plugin [cordova-plugin-local-notifications](https://github.com/katzer/cordova-plugin-local-notifications) will not be maintained anymore.
 
-A notification is a message you display to the user outside of your app's normal UI. When you tell the system to issue a notification, it first appears as an icon in the notification area. To see the details of the notification, the user opens the notification drawer. Both the notification area and the notification drawer are system-controlled areas that the user can view at any time.
+Schedule local notifications on Android and iOS from your Cordova app. Local notifications are created on the device; they do not require a push notification server.
 
-<img style="float: right; padding: 20px; padding-right: 40px;" width="320" src="images/android-notification-example.png">
+Notifications can display text, play a sound, update a badge, and offer action buttons. Their appearance and behavior depend on the platform, device capabilities, and the user's notification settings.
 
-### Notification components
+| Android 16 - Notification Drawer | iOS 26.5 - Notification Center |
+| :--------- | :------- |
+| <img width="320" src="images/android-notification-example-android16-full.png" alt="Notification drawer showing an appointment reminder on Android 16, with the full Pixel 10 Pro emulator frame"> | <img width="320" src="images/ios-notification-example-ios26-full.png" alt="Notification Center showing an appointment reminder on iOS 26.5, with the full iPhone 17 Pro simulator frame"> |
 
-- Header area
-- Content area
-- Action area
+*Notifications created with this plugin in the Pixel 10 Pro emulator (Android 16) and iPhone 17 Pro simulator (iOS 26.5), with their complete original device frames. The screenshots show the notification drawer on Android and Notification Center on iOS. Android uses the plugin's default channel importance ([`IMPORTANCE_DEFAULT`](#property-androidchannelimportance)), without requesting a heads-up banner. Appearance varies by platform, device, and notification settings.*
 
-### How notifications may be noticed
+## Contents
 
-- Showing a status bar icon
-- Appearing on the lock screen
-- Playing a sound or vibrating
-- Peeking onto the current screen
-- Blinking the device's LED
+- [Installation](#installation) and [supported platforms](#supported-platforms)
+- [Quick start](#basics)
+- [Notification examples](#notification-examples): shared options and [one notification with platform-specific options](#one-notification-with-platform-specific-options)
+- [Permissions](#permissions), [Android notification settings](#check-android-notification-settings), and [notification limits](#notification-limits)
+- [Android behavior](#android-specials), [channels](#android-channels), and [exact alarms](#android-schedule-exact-alarms)
+- [Actions](#actions), [triggers](#triggers), and [events](#events)
+- [Troubleshooting](#troubleshooting)
+- [Methods](#methods)
+- [Property reference](#properties-1): [common](#common-properties), [Android](#android-properties), and [iOS](#ios-properties)
+- [Upgrade notes](#upgrade-notice) and [renamed properties](#changed-properties)
 
-### Supported platforms
+The channel query ([`getChannel()`](#getchannel)), `channel.enabled`, and channel-group APIs described below are available in **1.2.5-dev on GitHub**. They are not included in the 1.2.4 npm release.
+
+### Supported Platforms
 
 - Android 7.0+ (minimum version by cordova-android 13.0.0) with a minimum WebView Version 60 (Android 8 is shipped with a WebView version 58 and must be updated with Google Play Store before)
 - iOS 11.3+ (minimum version by cordova-ios 7.0.0)
@@ -50,7 +57,7 @@ Install a specific version:
 cordova plugin add cordova-plugin-local-notifications-continued@1.2.4
 ```
 
-##### Version Older Than 1.2.4 (Original from [katzer/cordova-plugin-local-notifications](https://github.com/katzer/cordova-plugin-local-notifications))
+##### Version Older Than 1.2.4 (Original From [katzer/cordova-plugin-local-notifications](https://github.com/katzer/cordova-plugin-local-notifications))
 
 ```bash
 cordova plugin add cordova-plugin-local-notification@1.2.3
@@ -76,121 +83,251 @@ Install from a specific commit:
 cordova plugin add https://github.com/GitToTheHub/cordova-plugin-local-notifications-continued#5e4f131
 ```
 
-## Upgrade Notice
+<a id="basics"></a>
+## Quick Start
 
-### Version 0.9.0-beta.3 (13.02.2018)
+Wait for Cordova's `deviceready` event before using `cordova.plugins.notification.local`.
+Check the current notification permission before scheduling so your app can respond if notifications are disabled. Users can revoke permission in system settings at any time; do not assume that an earlier grant still applies. This example uses [`requestPermission()`](#requestpermission) to check the current app-level permission and request it when the system allows a prompt.
 
-- Last version which supports `cordova-android` older than `13.0.0` and supports minimum `cordova-android` version `6.0.0` which is Android version `4.1`
-- Last version which supports the Windows platform
+```js
+document.addEventListener('deviceready', () => {
+    const notifications = cordova.plugins.notification.local;
 
-### Version 1.0.0 (17.08.2024)
+    // Check the current app-level permission; the user may have revoked it.
+    // Request permission if needed and handle a denial before scheduling.
+    notifications.requestPermission((granted) => {
+        if (!granted) {
+            console.log('Notification permission was not granted.');
+            return;
+        }
 
-- Removed Windows platform
-- Support for Android 12-14 and uses AndroidX
-- Raised minimum `cordova-android`version from `6.0.0` to `13.0.0`, which raised the minimum Android version from `4.1` `SDK 16` to `7.0` `SDK 24`
-- Raised minimum `cordova-ios` version from `4.3.0` to `7.0.0`
-- Raised minimum Cordova version from `3.6.0` to `12.0.0`
-- Raised minimum `cordova-plugin-device` version from `2.0.0` to `3.0.0`
+        notifications.schedule({
+            id: 1,
+            title: 'My first notification',
+            text: 'Your reminder is ready.',
+            trigger: { in: 5, unit: 'second' }
+        });
+    });
+}, false);
+```
 
-### Updates in version 1.1.0 (23.12.2024)
+On Android, app-level permission does not tell you whether an individual channel is blocked. For apps that rely on reminders, also check the selected channel as shown in [Check Android Notification Settings](#check-android-notification-settings).
 
-- Proper handling of Android channels
-- Properties were renamed for the Android platform, see [Changed properties](#changes-since-version-110).
+The trigger requests delivery after five seconds. Android may deliver it later when exact alarms are not permitted; see [exact alarms](#android-schedule-exact-alarms).
 
-#### Android
+[`schedule()`](#schedule) also checks and requests app-level permission automatically. The explicit check above lets your app explain a denial and offer a way to open settings before attempting to schedule. It does not check whether an individual Android channel is blocked. Request permission at a point where the user understands why your app needs it. See [Permissions](#permissions).
 
-The [Default channel](#default-channel) id was changed from `default-channel-id` to `default_channel`. If you upgrade to this version and schedule notifications, there will be two channels from then on, the old one and the new one. You can remove the old one with [deleteChannel](#deletechannel).
+Give each notification a unique numeric [`id`](#property-id). If omitted, the ID defaults to `1`; reusing an ID replaces the previous notification with that ID.
 
-#### iOS
-
-[iOSForeground](#property-iosforeground) is `true` by default
-
-### Updates in version 1.1.1
-
-#### Android
-
-The property `vibrate` was renamed to [androidChannelEnableVibration](#property-androidchannelenablevibration).
-
-#### iOS
-
-A notification will be always showed in the notification center like on Android. Happens also if [iOSForeground](#property-iosforeground) is `false`.
-
-### Updates in Version 1.1.4
-
-#### Android
-
-Notifications with an old `trigger.at` date will be shown when you schedule them. Before they were ignored.
-
-### Updates in Version 1.1.8
-
-- Notifications with `trigger.at` date more than 5 seconds in the past will be ignored. iOS did always ignore passed notifications.
-- If no [id](#property-id) of a notification is set, it will default to `1` instead of `0`.
-
-## Basics
-
-The plugin creates the object `cordova.plugins.notification.local` and is accessible after the `deviceready` event has been fired.
-
-You can schedule a single notification as follows:
+Without a [`trigger`](#triggers), the plugin requests immediate delivery:
 
 ```js
 cordova.plugins.notification.local.schedule({
-    id: 1,
-    title: 'My first notification',
-    text: 'Thats pretty easy...'
+    id: 2,
+    title: 'Ready now',
+    text: 'Your download is complete.'
 });
 ```
 
-<img width="320" src="images/ios-notification.png">
-
-You have always to set an unique ID for every notification. The plugin does not automatically set an ID. If you do not set an ID, it will default to `1`. If you reuse an ID of a previous scheduled notification, the previous one will be canceled.
-
-The plugin allows to schedule multiple notifications at once:
+To schedule several notifications, pass an array:
 
 ```js
 cordova.plugins.notification.local.schedule([
-    {
-        id: 1,
-        title: 'My first notification'
-    },
-    {
-        id: 2,
-        title: 'My second notification'
-    }
+    { id: 3, title: 'First reminder', trigger: { in: 1, unit: 'minute' } },
+    { id: 4, title: 'Second reminder', trigger: { in: 2, unit: 'minute' } }
 ]);
 ```
 
+### Check Android Notification Settings
+
+On Android 8 and newer, users can disable notifications for the entire app, an individual channel, or a channel group. For an existing channel, [`getChannel()`](#getchannel) combines these settings in `channel.enabled`:
+
+```js
+// Run after deviceready, for example when refreshing reminder settings.
+if (cordova.platformId === 'android') {
+    cordova.plugins.notification.local.getChannel('default_channel', (channel) => {
+        if (channel === null) {
+            console.log('No channel settings are available yet.');
+            return;
+        }
+
+        if (!channel.enabled) {
+            console.log('Notifications are disabled. Please check Android notification settings.');
+            return;
+        }
+
+        console.log('Notifications are enabled for this channel.');
+    });
+}
+```
+
+Use the channel ID your notifications actually use: `default_channel` if you leave the defaults unchanged, or your own [`androidChannelId`](#property-androidchannelid).
+
+- A channel is available when app notifications are enabled and neither the channel nor its group is blocked. This does not guarantee sound, exact timing, or delivery in every device mode.
+- **`channel === null`:** the channel has not been created, was deleted, or channels are unsupported (Android 7). This is not a permission decision; [`schedule()`](#schedule) can create a missing channel. Check app-level permission separately with [`requestPermission()`](#requestpermission) or [`hasPermission()`](#haspermission).
+
+[`hasPermission()`](#haspermission) checks only whether notifications are enabled for the app and also works on iOS. [`getChannel()`](#getchannel) also checks whether the selected Android channel or its channel group blocks notifications. Its `appNotificationsEnabled` field repeats the same app-level status that [`hasPermission()`](#haspermission) returns on Android, so you do not need a second call just to read that status for an existing channel. The detailed fields `blocked` and `groupBlocked` are available when you need to explain the specific reason; see [getChannel](#getchannel).
+
+## Notification Examples
+
+Run these examples after `deviceready`. Each example is independent. They show common combinations; you do not need to specify every option. Omitted options use the [default values](#default-values).
+
+### Shared Options Example
+
+This example uses properties supported on both Android and iOS:
+
+```js
+cordova.plugins.notification.local.schedule({
+    id: 10,
+    title: 'Appointment reminder',
+    text: 'Your appointment starts in 30 minutes.',
+    trigger: { in: 30, unit: 'minute' },
+    sound: 'default',
+    launch: true,
+    data: { appointmentId: 'appointment-42' }
+});
+
+cordova.plugins.notification.local.on('click', (notification) => {
+    console.log('Open appointment:', notification.data.appointmentId);
+});
+```
+
+`data` carries your own application data; it is not displayed in the notification. Use it to decide what to open when the user taps the notification. See [common properties](#common-properties), [triggers](#triggers), and [events](#events).
+
+### One Notification With Platform-Specific Options
+
+Combine shared content and conditional platform options in a single [`schedule()`](#schedule) call. Object spread (`...`) includes only the options for the current platform:
+
+```js
+cordova.plugins.notification.local.schedule({
+    id: 15,
+    title: 'Appointment reminder',
+    text: 'Your appointment starts in 30 minutes.',
+    trigger: { in: 30, unit: 'minute' },
+    sound: 'default',
+    launch: true,
+    data: { appointmentId: 'appointment-42' },
+
+    ...(cordova.platformId === 'android' ? {
+        androidChannelId: 'appointment_reminders',
+        androidChannelName: 'Appointment reminders',
+        androidChannelImportance: 'IMPORTANCE_DEFAULT',
+        androidAutoCancel: true,
+        androidColor: '#1565C0'
+    } : {}),
+
+    ...(cordova.platformId === 'ios' ? {
+        iOSForeground: true,
+        badgeNumber: 1
+    } : {})
+});
+```
+
+> [!NOTE]
+> Object spread in `{ ...options }` requires Android WebView 60 or newer and iOS 11.3 or newer, matching the minimum versions listed in [Supported Platforms](#supported-platforms). Android 7 devices with an older, non-updated WebView may not understand this syntax; use `Object.assign()` instead if your application needs to support them. The plugin uses `Object.assign()` internally in some places for this compatibility reason. Rest parameters such as `function (event, ...args) {}` are a different JavaScript feature with earlier support; their presence in the plugin does not imply support for object spread. See [MDN: Spread Syntax](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_syntax#browser_compatibility).
+
+Both platforms use the same ID, title, text, trigger, and application data. Android adds channel and appearance settings; iOS adds foreground presentation and badge settings. Only the current platform's options are passed to the plugin, avoiding warnings about unknown properties. [`badgeNumber`](#property-badgenumber) is shared by both platforms, but this example deliberately sets it only on iOS because its behavior differs by platform.
+
+On Android 8 and newer, channel settings control sound, vibration, and importance for all notifications using that channel. [`schedule()`](#schedule) creates the selected channel if needed; without channel properties, it uses the [default channel](#default-channel). You do not need to call [`createChannel()`](#createchannel) first. Reusing a channel ID does not reset its settings, which the user can change in Android's system settings. See [Android Channels](#android-channels) for details, including separate channel creation. Android 7 has no notification channels; applicable settings are applied to individual notifications.
+
+On iOS, [`iOSForeground`](#property-iosforeground) allows a banner while the app is open. `badgeNumber: 1` sets the badge to one rather than incrementing it. Vibration cannot be configured independently of sound. See [iOS Properties](#ios-properties), [badgeNumber](#property-badgenumber), and [sound](#property-sound).
+
+For other notification types, see [action buttons and text input](#actions), [images and attachments](#property-attachments), [progress indicators](#progress), [message summaries](#summarizing), and [grouping](#grouping). These features are documented separately because they are not all applicable to the same notification.
+
 ## Notification Limits
-On each platform are limits about how much notifications can be scheduled:
+The number of pending notifications is limited by the platform:
 
 - iOS: 64
 - Android: 500
 
-Repeating notifications count as 1 notification.
+A repeating notification counts as one pending notification.
 
-## Properties
-A notification does have a set of configurable properties. See [all properties](#properties-1).
+<a id="properties"></a>
+## Choosing Notification Options
+
+Start with [`id`](#property-id), `title`, and `text`, then add a [`trigger`](#triggers) for delayed or repeating delivery.
+
+- [Common properties](#common-properties) are supported on both platforms, although behavior can differ.
+- [Android properties](#android-properties) configure Android channels, appearance, and delivery behavior.
+- [iOS properties](#ios-properties) configure iOS-specific behavior.
+- [Available properties](#available-properties) explain individual options in more detail.
+
+Use the current property names in new code. If you are adapting an older example, check [Changed properties](#changed-properties).
 
 ## Permissions
-On iOS and Android 13+ permissions must be requested from the user before notifications can be posted. This is done automatically, when scheduling a notification. If you want do it manually, you can use [requestPermission](#requestpermission). Please keep in mind, that the user can still change the permission later in the system. If you want to check, if you have still the permission to post notifications, use [hasPermission](#haspermission).
 
-<img width="240" src="images/ios-request-permission.png">
-<img width="240" src="images/android-request-permission.png">
+On iOS and Android 13 or newer, the user must allow notifications before your app can post them. [`schedule()`](#schedule) requests this permission automatically. You can also call [requestPermission](#requestpermission) explicitly, as shown in the [quick start](#basics).
 
-On Android, the permissions must be requested since Android 13. In earlier versions no permissions must be granted.
+### Recheck Permission After Settings Changes
 
-## Android specials
+A previous grant is not permanent. Users can disable notifications later, including while your app is in the background. Do not rely on a permanently cached permission result.
 
-### Notification channels
-Since Android 8 notification channels must be created to post noitifications. A [default channel](#default-channel) will be created for you, if you do not create one. You can also create your own channel by [createChannel](#createchannel) or when [scheduling a notification](#create-channel-by-posting-a-notification). For deleting a channel use [deleteChannel](#deletechannel).
+Choose the method according to what your app is doing:
 
-### Inexact alarms since Android 12
+- **Enabling or scheduling reminders:** call [requestPermission](#requestpermission) directly and handle its result, as shown in the [Quick Start](#basics). You do not need to call [`hasPermission()`](#haspermission) first. If permission is already granted, no new dialog is needed.
+- **Displaying the current permission status:** use [hasPermission](#haspermission) to check without requesting permission. For example, refresh a status indicator when your app resumes after the user visits system settings.
+
+[`schedule()`](#schedule) already checks and requests app-level permission automatically. An explicit [`requestPermission()`](#requestpermission) call lets your app respond to a denial before attempting to schedule, for example by explaining how to enable notifications in settings.
+
+The following example only reads the status when the app resumes; it does not request permission. Register the listener after `deviceready`:
+
+```js
+document.addEventListener('resume', () => {
+    cordova.plugins.notification.local.hasPermission((granted) => {
+        // Update your app's permission status indicator.
+        console.log('Notifications allowed:', granted);
+    });
+}, false);
+```
+
+The system decides whether to show a permission dialog. Calling [`requestPermission()`](#requestpermission) does not guarantee another prompt if the user has already made a choice. Users can change permissions later in system settings; see [openNotificationSettings](#opennotificationsettings).
+
+| Android | iOS |
+| :------ | :-- |
+| <img width="240" src="images/android-request-permission.png" alt="Android notification permission dialog"> | <img width="240" src="images/ios-request-permission.png" alt="iOS notification permission dialog"> |
+
+### Android: App Permission and Channel Settings
+
+Android has two separate levels of notification control:
+
+- **App level:** users can disable notifications for the entire app. On Android 13 and newer, this includes the `POST_NOTIFICATIONS` runtime permission. Earlier Android versions also allow notifications to be disabled in system settings.
+- **Channel level (Android 8 and newer):** users can block an individual channel or change its sound, vibration, and importance while leaving notifications enabled for the app. See [Android channel settings](https://developer.android.com/develop/ui/views/notifications/channels).
+
+**App and channel checks are separate:** [`hasPermission()`](#haspermission) and [`requestPermission()`](#requestpermission) check the app-level status. On Android they use `areNotificationsEnabled()`; they do not inspect a specific channel. Use [getChannel](#getchannel) to read the channel's current settings, including whether the channel or its group is blocked. App-level permission alone does not guarantee that a notification on a particular channel will be displayed or make a sound.
+
+If reminders are missing despite app-level permission being granted, ask the user to check the relevant channel in Android's notification settings. [openNotificationSettings](#opennotificationsettings) opens the app's notification settings; it does not automatically re-enable a blocked channel.
+
+
+For platform details, see [Android notification permission](https://developer.android.com/develop/ui/views/notifications/notification-permission) and [Apple: Asking permission to use notifications](https://developer.apple.com/documentation/usernotifications/asking-permission-to-use-notifications).
+
+Notification permission and Android's **exact alarm permission** are separate. Notification permission allows your app to display notifications; exact alarm permission affects when scheduled notifications can be delivered. See [exact alarms](#android-schedule-exact-alarms).
+
+## Troubleshooting
+
+| Problem | What to check |
+| :------ | :------------ |
+| `cordova.plugins.notification.local` is unavailable | Install the plugin, rebuild the native app, and wait for `deviceready`. The plugin supports Android and iOS, not a regular browser page. |
+| A notification does not appear | Check [notification permission](#permissions), system notification settings, and the selected Android channel. Make sure the trigger is not in the past. |
+| A reminder arrives later than requested on Android | Check [exact alarm permission](#android-schedule-exact-alarms), [Doze](#doze-and-standby), and battery restrictions. Notification permission alone does not enable exact timing. |
+| A notification replaces an earlier one | Give each notification a unique numeric [ID](#property-id). The default is `1`. |
+| Changing sound or vibration has no effect on Android | Check whether the [channel](#android-channels) already exists. New values do not reset an existing channel's settings. |
+| No banner appears while the app is open on iOS | Check [iOSForeground](#property-iosforeground) and the user's notification settings. |
+| iOS action buttons are not visible | Press and hold the notification to expand it. See [Actions](#actions). |
+| A custom image or sound cannot be found | Check the property's supported platforms and [resource patterns](#resource-resolving). |
+
+## Android Specials
+
+### Notification Channels
+Android 8 and newer require a channel for each notification. The plugin creates a [default channel](#default-channel) if you do not specify one. Create your own channel with [createChannel](#createchannel) or by [scheduling a notification with channel properties](#create-channel-by-posting-a-notification). Use [deleteChannel](#deletechannel) to remove a channel. See the [combined platform example](#one-notification-with-platform-specific-options) for the complete flow.
+
+### Inexact Alarms Since Android 12
 Since Android 12 alarms will be scheduled inexact by default. On Android 12 (API level 31) and higher, the system invokes the alarm within one hour of the supplied trigger time, unless any battery-saving restrictions are in effect such as battery saver or Doze. Most apps can schedule tasks and events using inexact alarms to complete several common use cases. If your app's core functionality depends on a precisely-timed alarm — such as for an alarm clock app or a calendar app — then it's OK to use an exact alarm instead.
 
 See [Schedule exact alarms](#android-schedule-exact-alarms), if you want use exact alarms.
 
 See [Android documentation](https://developer.android.com/develop/background-work/services/alarms/schedule) for more information.
 
-### App hibernation / App unused
+### App Hibernation / App Unused
 If your app runs on Android 12 and newer and the user doesn't interact with your app for 3 months, the system places your app in a hibernation state which will cancel all pending notifications and revokes permissions. When the user interacts with your app again, the app exits hibernation and the notifications will be re-scheduled. It doesn't count as app usage if the user dismisses a notification. If the app is hibernated, the user will get informed about it:
 
 <img width="320" src="images/android-app-hibernation-notification.png">
@@ -203,7 +340,7 @@ The documentation says that permissions are also revoked, but testing the hibern
 - To see a complete list, what counts as app usage and what not, see [App hibernation > App usage](https://developer.android.com/topic/performance/app-hibernation#app-usage).
 - 3 months are based on executing `adb shell device_config get permissions \ auto_revoke_unused_threshold_millis2` which will return `7776000000` milliseconds on an Android 15 Emulator which are nearly 3 months (~2.96 months).
 
-#### Manage App hibernation
+#### Manage App Hibernation
 
 You can get the status of the setting by calling [getUnusedAppRestrictionsStatus](#getunusedapprestrictionsstatus). To redirect the user to the setting, call [openManageUnusedAppRestrictions](#openmanageunusedapprestrictions). Before opening the setting, you can inform the user about this behavior and explain which setting he has to deactivate. When opening the settings, the system will not scroll to the right entry and the setting is named differently on different Android versions:
 
@@ -231,22 +368,20 @@ App Standby does not affect you when showing a notification.
 
 You can read everything about it in the [Android documentatation](https://developer.android.com/training/monitoring-device-state/doze-standby).
 
-### Alarm rescheduling
+### Alarm Rescheduling
 
 #### App Update
 Android removes all alarms when the app is updated. The plugin reschedules all alarms by a [BroadcastReceiver](https://developer.android.com/develop/background-work/background-tasks/broadcasts) listening to [ACTION_MY_PACKAGE_REPLACED](https://developer.android.com/reference/android/content/Intent#ACTION_MY_PACKAGE_REPLACED).
 
-#### Device reboot
+#### Device Reboot
 
 Android removes all alarms when the device reboots. The plugin reschedules all alarms by a [BroadcastReceiver](https://developer.android.com/develop/background-work/background-tasks/broadcasts) listening to [ACTION_BOOT_COMPLETED](https://developer.android.com/reference/android/content/Intent#ACTION_BOOT_COMPLETED), but only after the device has been unlocked.
 
-#### User grants exact alarms
+#### User Grants Exact Alarms
 
 If you use [SCHEDULE_EXACT_ALARM](#exact-alarms-user-grants-permission) for scheduling exact alarms and the user permits the permission in the "Alarms & Reminders", inexact alarms will be rescheduled as exact alarms. This is done by a [BroadcastReceiver](https://developer.android.com/develop/background-work/background-tasks/broadcasts) listening to [ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED](https://developer.android.com/reference/android/app/AlarmManager#ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED). This action will not be called if the user revokes the permission. All exact alarms will be canceled then.
 
-[](README.md#android-15-alarms-get-canceled-on-force-stop)
-
-#### Android 15: Alarms get canceled on `Force stop`
+#### Android 15: Alarms Get Canceled on `Force stop`
 Since Android 15 all pending alarms will get canceled if the user force stops an app, this is a change by Google, see https://developer.android.com/about/versions/15/behavior-changes-all#enhanced-stop-states. The alarms will be re-registered, if the user starts the app again. If the user clears the app from the app stack the alarms will not get canceled.
 
 Keep in mind, that force stopping is only known by advised users and if they do it, they have a reason to do this and they should be aware, that the app will no longer function correctly as the System also states when clicking on `Force stop` by showing an alert with the message `If you force stop an app, it may misbehave.`
@@ -334,7 +469,7 @@ cordova.plugins.notification.local.schedule({
 | :----------- | :----------- |
 | <img width="240" src="images/ios-actions-with-input.png"> | <img width="240" src="images/android-actions-with-input-not-clicked.png"><br><img width="240" src="images/android-actions-with-input-clicked.png"> |
 
-#### Read input data
+#### Read Input Data
 
 You have to subscribe to the event of the action id. The parameter `event` in the event callback will contain the input data of the user:
 
@@ -346,17 +481,17 @@ cordova.plugins.notification.local.on('REPLY_ACTION', (notification, event) => {
 ```
 
 
-##### Android sepcifics
+##### Android Specifics
 
 When a notification has an input action, it can't be cleared from the statusbar (see
 [Stackoverflow](https://stackoverflow.com/questions/54219914/cancel-notification-with-remoteinput-not-working) or [plugin issue #2080](https://github.com/katzer/cordova-plugin-local-notifications/issues/2080)).
-Google recommends to update the notification after the user made an input and show the reply without the actions. This plugin does this, but without showing the reply of the user and directly clear the notification after the update. Because the notiification will be updated after the input, you will get also an `update` event for that notification.
+Google recommends to update the notification after the user made an input and show the reply without the actions. This plugin does this, but without showing the reply of the user and directly clear the notification after the update. Because the notiification will be updated after the input, you will get also an [`update`](#methods) event for that notification.
 
-### Handle action events
+### Handle Action Events
 
 See [Subscribe to an action event](#subscribe-to-an-action-event).
 
-### Action properties
+### Action Properties
 
 #### Common
 
@@ -371,7 +506,7 @@ These common properties can be specified for an action of type `button` or `inpu
 | needsAuth    |         | x   | <img src="images/apple-icon.svg" width="16"> If set to `true` the action can be performed only on an unlocked device. When the user selects an action with this option, the system prompts the user to unlock the device. After unlocking, the system notifies your app of the selected action. You might use option to perform actions that require accessing data that is encrypted while the device is locked. Sets natively [UNNotificationActionOptionAuthenticationRequired](https://developer.apple.com/documentation/usernotifications/unnotificationactionoptions/authenticationrequired?language=objc). |
 | icon         | x       |     | <img src="images/android-icon.svg" width="16"> Is not supported anymore for normal notifications since Android 7, see [Google Blog article for notifications on Android 7](https://android-developers.googleblog.com/2016/06/notifications-in-android-n.html). It will be only used on Android Wear. |
 
-#### Action input properties
+#### Action Input Properties
 
 These properties can additionally be specified for an `input` action:
 
@@ -386,7 +521,7 @@ These properties can additionally be specified for an `input` action:
 
 Notifications may trigger immediately or depend on calendar or location.
 
-### Fixed date
+### Fixed Date
 Trigger at a fixed date:
 
 ```js
@@ -454,7 +589,7 @@ cordova.plugins.notification.local.schedule({
 | count         | Int     |                  | x       |     |      |
 | every         | Object  | `minute`, `hour`, `day`, `weekday`, `weekdayOrdinal` <img src="images/apple-icon.svg" width="16">, `week` <img src="images/apple-icon.svg" width="16">, `weekOfMonth`, `month`, `quarter`  <img src="images/apple-icon.svg" width="16"> | x       | x   | |
 
-### Location based
+### Location Based
 <img src="images/apple-icon.svg" width="16"> iOS only
 
 To trigger when the user enters a region:
@@ -601,7 +736,6 @@ cordova.plugins.notification.local.schedule([
     {
         id: 1,
         title: 'Design team meeting',
-        ...
     },
     {
         id: 2,
@@ -612,19 +746,16 @@ cordova.plugins.notification.local.schedule([
     {
         id: 3,
         title: 'Please take all my money',
-        ...,
         androidGroup: 'email'
     },
     {
         id: 4,
         title: 'A question regarding this plugin',
-        ...,
         androidGroup: 'email'
     },
     {
         id: 5,
-        title: 'Wellcome back home',
-        ...,
+        title: 'Welcome back home',
         androidGroup: 'email'
     }
 ]);
@@ -634,13 +765,60 @@ cordova.plugins.notification.local.schedule([
     <img src="images/android-stack.png">
 </p>
 
-## Android channels
+## Android Channels
+
+A channel represents a category such as reminders or messages. On Android 8 and newer, sound, vibration, lights, and importance belong to the channel, rather than to each individual notification.
+
+Choose a stable channel ID and a name the user can recognize in system settings. Set sound, vibration, and importance when the channel is first created. Changing these options in a later [`schedule()`](#schedule), [`createChannel()`](#createchannel), or [`setDefaults()`](#setdefaults) call does not override an existing channel's settings. Users control these settings after creation. Android still allows the channel name and description to be updated. See [Android: Create and manage notification channels](https://developer.android.com/develop/ui/views/notifications/channels).
+
+On Android 7, channel IDs do not select system channels; applicable sound, vibration, and priority settings are applied to individual notifications instead.
+
+
+### Android Channel With a Custom Sound
+
+Add your audio file to `www/audio/reminder.mp3` in your Cordova app, then rebuild the app so the file is packaged with it. Run this example after `deviceready`:
+
+```js
+if (cordova.platformId === 'android') {
+    const notifications = cordova.plugins.notification.local;
+
+    notifications.requestPermission((granted) => {
+        if (!granted) {
+            console.log('Android: notification permission is denied.');
+            return;
+        }
+
+        notifications.createChannel({
+            androidChannelId: 'reminders_custom_sound',
+            androidChannelName: 'Reminders',
+            androidChannelDescription: 'Appointment reminders with a custom sound',
+            androidChannelImportance: 'IMPORTANCE_DEFAULT',
+            sound: 'www/audio/reminder.mp3'
+        }, () => {
+            notifications.schedule({
+                id: 70,
+                title: 'Appointment reminder',
+                text: 'Your appointment starts soon.',
+                androidChannelId: 'reminders_custom_sound',
+                sound: 'www/audio/reminder.mp3',
+                trigger: { in: 10, unit: 'second' }
+            });
+        });
+    });
+}
+```
+
+On Android 8 and newer, the sound is set when the channel is first created. The callback ensures channel creation finishes before scheduling. Each notification selects that channel using the same [`androidChannelId`](#property-androidchannelid). The [`sound`](#property-sound) on the notification also supports Android 7, which has no channels.
+
+If you already created this channel ID with another sound (or without sound), changing the code will not replace its sound. During development, test with a new channel ID. In a released app, respect the user's channel settings; users can change the sound or disable the channel in Android settings. App notification permission alone does not guarantee that the channel is audible: channel settings, silent mode, volume, and Do Not Disturb can affect it.
+
+You can also pass the channel properties and sound directly to [`schedule()`](#schedule), which creates a missing channel automatically. Separate [`createChannel()`](#createchannel) calls are useful when preparing categories before posting notifications. See [sound](#property-sound) for other supported sound sources.
 
 ### Channel Groups
 
 Channel groups organize channels in Android's notification settings, for example by account or household. They are different from [notification grouping](#grouping), which bundles posted notifications in the notification drawer. The plugin does not create a default group; channels remain ungrouped unless you assign one.
 
-Create a group first, then pass its ID as `androidChannelGroupId` when creating a channel or scheduling a notification. Wait for the group callback so the group exists before the channel is created:
+Create a group first, then pass its ID as [`androidChannelGroupId`](#channel-groups) when creating a channel or scheduling a notification. Wait for the group callback so the group exists before the channel is created:
 
 ```js
 if (cordova.platformId === 'android') {
@@ -666,9 +844,9 @@ if (cordova.platformId === 'android') {
 }
 ```
 
-The group must already exist when using `androidChannelGroupId`. On Android 7 this property is ignored because channels and channel groups are unsupported. On iOS, omit Android-specific options.
+The group must already exist when using [`androidChannelGroupId`](#channel-groups). On Android 7 this property is ignored because channels and channel groups are unsupported. On iOS, omit Android-specific options.
 
-An existing ungrouped channel can be assigned to a group without resetting its sound or importance. Once a channel belongs to a group, Android does not allow moving it to another group; reusing its ID with another `androidChannelGroupId` leaves the original group unchanged.
+An existing ungrouped channel can be assigned to a group without resetting its sound or importance. Once a channel belongs to a group, Android does not allow moving it to another group; reusing its ID with another [`androidChannelGroupId`](#channel-groups) leaves the original group unchanged.
 
 Groups are available from Android 8 (API 26). Android 9 (API 28) adds group descriptions and the ability to block an entire group. On Android 8, group queries return `description: null` and `blocked: false`. On Android 9 and newer, [getChannel](#getchannel) includes the actual group blocking status in `groupBlocked`.
 
@@ -676,22 +854,23 @@ Use [getChannelGroup](#getchannelgroup) to inspect a group, or [deleteChannelGro
 
 See [Android: Create and Manage Notification Channels](https://developer.android.com/develop/ui/views/notifications/channels) for the platform behavior.
 
-### Default channel
-The following settings will be used for the default Android channel.
+
+### Default Channel
+If no channel is specified, the plugin uses these default channel settings:
 
 ```javascript
-{
+const defaultChannel = {
     androidChannelId: "default_channel",
     androidChannelName: "Default channel",
     androidChannelImportance: "IMPORTANCE_DEFAULT"
 }
 ```
 
-You can change the defaults by calling [setDefaults](#setdefaults) or you can overwrite them, when scheduling a notification or [creating a channel](#createchannel).
+Use [setDefaults](#setdefaults) to select defaults for future calls, or pass channel properties when scheduling a notification or [creating a channel](#createchannel). These values configure a new channel; they do not reset an existing channel.
 
 The default channel id was changed in version 1.1.0 from `default-channel-id` to `default_channel`.
 
-### Create channel by posting a notification
+### Create Channel by Posting a Notification
 A channel can be created directly when posting a notification:
 
 ```javascript
@@ -705,21 +884,21 @@ cordova.plugins.notification.local.schedule({
 
 If you omit some channel properties the [default channel properties](#default-channel) will be used.
 
-## Android: Schedule exact alarms
+## Android: Schedule Exact Alarms
 Since Android 12 notifications will be scheduled inexact by default. On Android 12 (API level 31) and higher, the system invokes the alarm within one hour of the supplied trigger time, unless any battery-saving restrictions are in effect such as battery saver or Doze. Most apps can schedule tasks and events using inexact alarms to complete several common use cases. If your app's core functionality depends on a precisely-timed alarm — such as for an alarm clock app or a calendar app — then it's OK to use an exact alarm instead.
 
 See [Android documentation](https://developer.android.com/develop/background-work/services/alarms/schedule) for more information.
 
 You have two options, to schedule exact alarms.
 
-### Exact alarms: User grants permission
+### Exact Alarms: User Grants Permission
 You must add the [SCHEDULE_EXACT_ALARM](https://developer.android.com/reference/android/Manifest.permission#SCHEDULE_EXACT_ALARM) permission to `AndroidManifest.xml`. You can do this with your `config.xml`.
 
 First add the Android xml namespace to your `widget` tag:
 
 ```xml
 <widget ... xmlns:android="http://schemas.android.com/apk/res/android">
-````
+```
 
 Then add the following [config-file](https://cordova.apache.org/docs/en/12.x/plugin_ref/spec.html#config-file) declaration to your `config.xml`:
 
@@ -738,7 +917,7 @@ This tells Android that your app wants to have the permission to schedule exact 
 
 On Android 12 `SCHEDULE_EXACT_ALARM` is pre-granted. On Android 13 and newer the user has to permit this in the "Alarms & Reminders" setting, which you can open by [openAlarmSettings](#openalarmsettings). You can use the [resume](https://cordova.apache.org/docs/en/12.x/cordova/events/events.html#resume) event of Cordova to check if exact alarms are permitted by [canScheduleExactAlarms](#canscheduleexactalarms). If you have already posted inexact alarms, before the user granted the exact alarm permission, inexact alarms will be automatically rescheduled by this plugin as exact alarms. The downside is, when the user revokes the exact alarm permission, your app will be killed and all exact alarms will be canceled without rescheduling them as inexact alarms. You have to reschedule them the next time the user starts your app. You can read everything about it in the [Android documentation](https://developer.android.com/about/versions/14/changes/schedule-exact-alarms).
 
-### Exact alarms: Define your app as a Calender or Alarm Clock app
+### Exact Alarms: Define Your App as a Calender or Alarm Clock App
 This is a very special case you should think about. When you declare your app as a calendar or alarm clock app, the app have to fullfill the requirements and must be approved by Google in the Play Store. Google could remove the app from the store if the app is found to be misusing the permission.
 
 Calendar or alarm clock apps need to send calendar reminders, wake-up alarms, or alerts when the app is no longer running. These apps can request the [USE_EXACT_ALARM](https://developer.android.com/reference/android/Manifest.permission#USE_EXACT_ALARM) permission. The `USE_EXACT_ALARM` permission will be granted on install, and apps holding this permission will be able to schedule exact alarms just like apps with the `SCHEDULE_EXACT_ALARM` permission. The advantage is, that this permission can't be revoked by the user.
@@ -749,7 +928,7 @@ First add the Android xml namespace to your `widget` tag:
 
 ```xml
 <widget ... xmlns:android="http://schemas.android.com/apk/res/android">
-````
+```
 
 Then add the following [config-file](https://cordova.apache.org/docs/en/12.x/plugin_ref/spec.html#config-file) declaration to your `config.xml`:
 
@@ -766,9 +945,9 @@ The permission `USE_EXACT_ALARM` exists since Android 13 and will be used from t
 
 ## Events
 
-The following events are supported: `add`, `trigger`, `click`, `clear`, `cancel`, `update`, `clearall` and `cancelall`. Clicks on actions will trigger an event for the action id.
+The following events are supported: `add`, [`trigger`](#triggers), `click`, [`clear`](#methods), [`cancel`](#methods), [`update`](#methods), `clearall` and `cancelall`. Clicks on actions will trigger an event for the action id.
 
-### Subscribe to an event
+### Subscribe to an Event
 
 ```js
 cordova.plugins.notification.local.on('click', (notification, event) => {
@@ -776,7 +955,7 @@ cordova.plugins.notification.local.on('click', (notification, event) => {
 });
 ```
 
-### Subscribe to an action event
+### Subscribe to an Action Event
 
 If you want to listen when an action was clicked or an input was made, you have to subscribe to the action id:
 
@@ -804,19 +983,19 @@ cordova.plugins.notification.local.on('YES_ACTION', (notification, event) => {
 __Note:__
 A click on an action will **not** open the app by default. In Android, the event will be hold back in a background process of the app to wait for the next time the app starts, but could be lost, if the system kills the app background process. To avoid this, define the action with property `launch: true`.
 
-#### Content of `event` parameter
+#### Content of `event` Parameter
 
 The `event` parameter of the event callback can contain the following properties:
 
 | Property     | Type         | Android | iOS | Description |
 | :----------- | :----------- | :------ | :-- | :---------- |
-| event        | String       | x       | x   | Contains the event name like `click`, `clear` or the action id, if an action was clicked. |
+| event        | String       | x       | x   | Contains the event name like `click`, [`clear`](#methods) or the action id, if an action was clicked. |
 | foreground   | Boolean      | x       | x   | If the app was in foreground, when the event was fired. |
 | queued       | Boolean      | x       | x   | If the event was hold, because `deviceready` was not yet fired. |
 | notification | int          | x       | x   | Notification id |
 | text         | String       | x       | x   | Contains the input data of a user made to an input action. |
 
-### Unsubscribe from an event
+### Unsubscribe From an Event
 
 To unsubscribe from an event, you have to use the same callback you used for subscribing to the event.
 
@@ -834,12 +1013,12 @@ cordova.plugins.notification.local.on('click', clickEventCallback);
 cordova.plugins.notification.local.un('click', clickEventCallback);
 ```
 
-### Fire manually
+### Fire Manually
 
 Not an official interface, however its possible to manually fire events.
 
 ```js
-cordova.plugins.notification.local.core.fireEvent(event, args);
+cordova.plugins.notification.local.fireEvent(event, ...args);
 ```
 
 ## Launch Details
@@ -857,7 +1036,7 @@ It might be possible that the underlying framework like __Ionic__ is not compati
 Therefore its possible to fire the queued events manually by defining a global variable.
 
 ```js
-window.skipLocalNotificationReady = true
+window.skipLocalNotificationReady = true;
 ```
 
 Once the app and Ionic is ready, you can fire the queued events manually.
@@ -868,52 +1047,73 @@ cordova.plugins.notification.local.fireQueuedEvents();
 
 ## Methods
 
-All methods work asynchronous and accept callback methods.
+Most methods that communicate with the native platform are asynchronous. Pass a callback to receive query results or continue after an operation completes. They do not return Promises.
 
-Note: This list has still to be documented.
+[`getDefaults()`](#getdefaults) returns a value synchronously. [`setDefaults()`](#setdefaults), [`on()`](#methods), and [`un()`](#methods) also operate in JavaScript without a native completion callback.
 
+```js
+const notifications = cordova.plugins.notification.local;
 
-| Method                         | Android | iOS | Comment                   |
-| :------------------------------| :-------| :-- | :------------------------ |
-| addActions                     | x       | x   | Defines some actions in a group to re-use them. See [Actions](#actions). |
-| cancel                         | x       | x   |                           |
-| cancelAll                      | x       | x   |                           |
-| [canScheduleExactAlarms](#canscheduleexactalarms) | x       | -   | Checks if exact alarms are permitted. Since Android 13 inexact alarms are permitted by default. |
-| clear                          | x       | x   | On Android, it clears a already posted notification from the statusbar. |
-| clearAll                       | x       | x   |                           |
-| [createChannel](#createchannel) | x       | -   | Creates a channel for Android to post notifications on. |
-| [createChannelGroup](#createchannelgroup) | x | - | Create or update an Android notification channel group. |
-| [getChannelGroup](#getchannelgroup) | x | - | Read a channel group and its channel IDs. |
-| [deleteChannelGroup](#deletechannelgroup) | x | - | Delete a group and all of its channels. |
-| [getChannel](#getchannel) | x | - | Read current Android channel settings without creating or changing the channel. |
-| [deleteChannel](#deletechannel) | x       | -   | Delete a channel by an id. |
-| fireQueuedEvents               | x       | x   | Fire queued events once the device is ready and all listeners are registered. This is done automatically, when `deviceready` is fired. Calls the Plugin with a `ready` action. |
-| get                            |         |     |                           |
-| getAll                         |         |     |                           |
-| getDefaults                    | x       | x   | Gets the default for notification properties. See [getDefaults](#getdefaults) |
-| getIds                         |         |     |                           |
-| getScheduled                   |         |     |                           |
-| getScheduledIds                |         |     |                           |
-| getTriggered                   |         |     |                           |
-| getTriggeredIds                |         |     |                           |
-| getType                        |         |     |                           |
-| [getUnusedAppRestrictionsStatus](#getUnusedAppRestrictionsStatus) | x       | -   | Gets the status of the unused app restrictions status |
-| hasActions                     | x       | x   | Checks if an action group exists by id like `hasActions('YES_NO_CATEGORY', (hasActions) => {})`                       |
-| [hasPermission](#hasPermission) | x       | x   | Checks if the app has permission to post notifications. |
-| [iOSClearBadge](#iosclearbadge) | -       | x   | Clears the badge          |
-| isPresent                      |         |     |                           |
-| isScheduled                    |         |     |                           |
-| isTriggered                    |         |     |                           |
-| on                             | x       | x   | Listen to an [Event](#events) |
-| [openAlarmSettings](#openalarmsettings) | x       | -   | Supported since Android 12. Opens the "Alarms & Reminders"-settings, where the user can manually enable exact alarms. |
-| [openManageUnusedAppRestrictions](#openManageUnusedAppRestrictions) | x       | -   | Opens the unused app restriction settings directly in the app. |
-| [openNotificationSettings](#opennotificationsettings) | x       | (x) | Opens the notifications settings since Android 8. On iOS it opens the app settings. |
-| removeActions                  |  x      | x   | Removes actions by a group id like `removeActions('YES_NO_CATEGORY', () => {})` which were previously created by `addActions` |
-| [requestPermission](#requestpermission) | x       | x   | Request permission to post notifications. This is called automatically when scheduling notifications. |
-| schedule                       | x       | x    | Schedules a single notification or multiple notifications. Accepts an object or an Array. |
-| [setDefaults](#setdefaults)    | x       | x   | Overwrites default values of notifications. Gets the default for notification properties. |
-| un                             | x       | x   | Unlisten to an [Event](#events) |
-| update                         | x       | x  | Updates a single notification or multiple notifications. The notification id has to be set to update a notification. Accepts an obect or an Array. |
+notifications.getScheduled((pending) => {
+    console.log('Pending notifications:', pending);
+});
+
+notifications.cancel(10, () => {
+    console.log('Notification 10 canceled.');
+});
+```
+
+Native methods accept an optional success callback and callback scope. The examples omit the scope when no specific callback context is needed.
+
+In the table, **pending** means scheduled for future delivery; **delivered** means already posted by the system. `x` indicates platform support and `—` means the method is platform-specific.
+
+| Method | Android | iOS | Description |
+| :----- | :------ | :-- | :---------- |
+| addActions | x | x | Register a reusable action group. See [Actions](#actions). |
+| cancel | x | x | Remove notifications and cancel their pending delivery. Accepts an ID or array of IDs. |
+| cancelAll | x | x | Remove all notifications and cancel all pending delivery. |
+| [canScheduleExactAlarms](#canscheduleexactalarms) | x | — | Check whether exact alarms are permitted. |
+| clear | x | x | Dismiss delivered notifications without canceling pending delivery. Accepts an ID or array of IDs. |
+| clearAll | x | x | Dismiss all delivered notifications without canceling pending delivery. |
+| [createChannel](#createchannel) | x | — | Create an Android notification channel. |
+| [createChannelGroup](#createchannelgroup) | x | — | Create or update an Android notification channel group. |
+| [getChannelGroup](#getchannelgroup) | x | — | Read a channel group and its channel IDs. |
+| [deleteChannelGroup](#deletechannelgroup) | x | — | Delete a group and all of its channels. |
+| [getChannel](#getchannel) | x | — | Read current Android channel settings without creating or changing the channel. |
+| [deleteChannel](#deletechannel) | x | — | Delete an Android channel by ID. |
+| fireQueuedEvents | x | x | Deliver queued events after listeners are registered. Normally called automatically; see [Launch Details](#launch-details). |
+| get | x | x | Retrieve one notification by ID, or an array of notifications by an array of IDs. |
+| getAll | x | x | Retrieve all pending and delivered notifications. |
+| [getDefaults](#getdefaults) | x | x | Return current property defaults synchronously. |
+| getIds | x | x | Retrieve the IDs of all pending and delivered notifications. |
+| getScheduled | x | x | Retrieve pending notifications. |
+| getScheduledIds | x | x | Retrieve the IDs of pending notifications. |
+| getTriggered | x | x | Retrieve delivered notifications. |
+| getTriggeredIds | x | x | Retrieve the IDs of delivered notifications. |
+| getType | x | x | Retrieve the state of an ID: `scheduled`, `triggered`, or `unknown`. |
+| [getUnusedAppRestrictionsStatus](#getunusedapprestrictionsstatus) | x | — | Retrieve the Android unused-app restrictions status. |
+| hasActions | x | x | Check whether an action group is registered. |
+| [hasPermission](#haspermission) | x | x | Check notification permission without requesting it. |
+| [iOSClearBadge](#iosclearbadge) | — | x | Clear the app icon badge. |
+| isPresent | x | x | Check whether an ID belongs to a pending or delivered notification. |
+| isScheduled | x | x | Check whether an ID belongs to a pending notification. |
+| isTriggered | x | x | Check whether an ID belongs to a delivered notification. |
+| on | x | x | Register a listener for an [event](#events). |
+| [openAlarmSettings](#openalarmsettings) | x | — | Open the exact alarm settings on Android 12 and newer. |
+| [openManageUnusedAppRestrictions](#openmanageunusedapprestrictions) | x | — | Open the unused-app restriction settings. |
+| [openNotificationSettings](#opennotificationsettings) | x | x | Open notification settings on Android 8 and newer, or app settings on iOS. |
+| removeActions | x | x | Remove a registered action group by ID. |
+| [requestPermission](#requestpermission) | x | x | Request notification permission and return the current grant status through the callback. |
+| schedule | x | x | Schedule one notification object or an array of notification objects. |
+| [setDefaults](#setdefaults) | x | x | Change property defaults synchronously for subsequent calls. |
+| un | x | x | Unregister an [event](#events) listener. |
+| update | x | x | Update existing notifications by ID. Accepts an object or array of objects. |
+
+### schedule
+
+Schedule one notification object or an array of notification objects. See [Quick Start](#basics) and [Notification Examples](#notification-examples) for complete examples.
+
+Signature: `schedule(options, callback, scope, args)`. The callback and scope are optional. Omit `args` unless you need additional scheduling options. A missing channel is created automatically using the supplied channel properties or the default channel settings.
 
 ### canScheduleExactAlarms
 <img src="images/android-icon.svg" width="16"> Android only
@@ -926,12 +1126,12 @@ Checks if the user has enabled the "Alarms & Reminders"-setting. If not, the not
 ### createChannel
 <img src="images/android-icon.svg" width="16"> Android only
 
-Creates a channel, if it not already exists. A channel is not changeable, after it is created. This is a restriction by Android.
-If a notification does not specify a [androidChannelId](#property-androidchannelid) a [default channel](#default-channel) will be used.
+Creates an Android notification channel if it does not already exist. Reusing its ID does not reset its sound, vibration, or importance. See [Android channels](#android-channels).
+If a notification does not specify an [androidChannelId](#property-androidchannelid), the [default channel](#default-channel) is used.
 
-For setting the channel, use [androidChannelId](#property-androidchannelid) when scheduling a notification.
+To post a notification to this channel, pass its [androidChannelId](#property-androidchannelid) to [`schedule()`](#schedule).
 
-Overview of all properties for a channel:
+Channel configuration example:
 
 ```js
 cordova.plugins.notification.local.createChannel({
@@ -943,8 +1143,12 @@ cordova.plugins.notification.local.createChannel({
     androidChannelEnableVibration: true, // boolean (optional), default is false
     sound: 'www/audio/ring.mp3', // string (optional)
     androidChannelSoundUsage: 5 // int (optional), default is USAGE_NOTIFICATION
-}, successCallback);
+}, () => {
+    console.log('Channel creation completed.');
+});
 ```
+
+The callback is optional. Use it when the next operation depends on channel creation having completed. You do not need a separate [`createChannel()`](#createchannel) call when scheduling: [`schedule()`](#schedule) creates the selected channel automatically if needed, as shown in the [combined platform example](#one-notification-with-platform-specific-options).
 
 Property documentation:
 - [androidChannelId](#property-androidchannelid)
@@ -960,11 +1164,12 @@ Android 8 and newer. Creates a notification channel group or updates its name an
 
 Signature: `createChannelGroup({ id, name, description }, callback, scope)`.
 
-- `id` and `name` must be non-empty strings.
+- [`id`](#property-id) and `name` must be non-empty strings.
 - `description` is a string or `null`; it is supported on Android 9 and newer. Omitting it clears the description when updating a group.
 - The callback receives `true` on Android 8 and newer, or `false` on Android 7 and iOS.
 
 See [Channel Groups](#channel-groups) for a complete example. The optional `scope` sets the callback's `this` context.
+
 
 ### getChannelGroup
 
@@ -983,13 +1188,14 @@ Signature: `getChannelGroup(groupId, callback, scope)`. `groupId` must be a non-
 
 | Field | Type | Meaning |
 | :---- | :--- | :------ |
-| `id` | string | Group ID. |
+| [`id`](#property-id) | string | Group ID. |
 | `name` | string | Current user-visible name. |
 | `description` | string or null | Group description; `null` on Android 8. |
 | `blocked` | boolean | Whether the user has blocked the group. Supported on Android 9 and newer; otherwise `false`. |
 | `channelIds` | string[] | IDs of the group's current, non-deleted channels. |
 
-The optional `scope` sets the callback's `this` context. Group blocking is separate from app permission and individual channel blocking; [getChannel](#getchannel) reports these settings separately.
+The optional `scope` sets the callback's `this` context. Group blocking is separate from app permission and individual channel blocking; [getChannel](#getchannel) provides their combined status in `enabled` as well as the individual fields.
+
 
 ### deleteChannelGroup
 
@@ -1002,6 +1208,7 @@ cordova.plugins.notification.local.deleteChannelGroup('household', (supported) =
 ```
 
 Signature: `deleteChannelGroup(groupId, callback, scope)`. `groupId` must be a non-empty string. Deleting an unknown group has no effect. The callback receives `true` on Android 8 and newer, or `false` on Android 7 and iOS. The optional `scope` sets the callback's `this` context.
+
 
 ### getChannel
 
@@ -1032,16 +1239,16 @@ For an existing channel, the callback receives:
 
 | Field | Type | Meaning |
 | :---- | :--- | :------ |
-| `id` | string | Channel ID. |
+| [`id`](#property-id) | string | Channel ID. |
 | `name` | string | Current user-visible channel name. |
 | `description` | string or null | Channel description. |
 | `importance` | number | Current Android importance: `0` = none, `1` = minimum, `2` = low, `3` = default, `4` = high, `5` = maximum. |
 | `enabled` | boolean | Combined status: `appNotificationsEnabled && !blocked && !groupBlocked`. `true` means none of these three settings blocks notifications; it does not guarantee sound or delivery. |
 | `blocked` | boolean | `true` when the channel importance is `IMPORTANCE_NONE` (`0`). This field does not include app-level or group-level blocking. |
-| `appNotificationsEnabled` | boolean | Current app-level notification status, also checked by `hasPermission()`. |
+| `appNotificationsEnabled` | boolean | Current app-level notification status, also checked by [`hasPermission()`](#haspermission). |
 | `groupId` | string or null | Channel group ID, if assigned. |
 | `groupBlocked` | boolean | Whether the channel's group is blocked. Group blocking is available on Android 9 and newer; otherwise `false`. |
-| `sound` | string or null | Configured Android sound URI, or `null` if no sound is configured. This is a system URI, not the original plugin resource path. |
+| [`sound`](#property-sound) | string or null | Configured Android sound URI, or `null` if no sound is configured. This is a system URI, not the original plugin resource path. |
 | `vibration` | boolean | Whether vibration is enabled for the channel. |
 | `lights` | boolean | Whether notification lights are enabled for the channel. Device support varies. |
 | `showBadge` | boolean | Whether the channel allows notification badges. Launcher support varies. |
@@ -1050,18 +1257,22 @@ These settings describe notification configuration, not a delivery guarantee. An
 
 See [Android Channels](#android-channels), [NotificationChannel](https://developer.android.com/reference/android/app/NotificationChannel), and [NotificationManager.getNotificationChannel](https://developer.android.com/reference/android/app/NotificationManager#getNotificationChannel(java.lang.String)).
 
+
+
 ### deleteChannel
 <img src="images/android-icon.svg" width="16"> Android only
 
-Deletes a Android channel.
+Deletes an Android notification channel by ID.
 
 Example:
 
 ```javascript
-cordova.plugins.notification.local.deleteChannel("my_channel_id", successCallback);
+cordova.plugins.notification.local.deleteChannel('my_channel_id', () => {
+    console.log('Channel deletion completed.');
+});
 ```
 
-These will delete all associated notificiations for this channel. If you create a new channel with the same id, the deleted channel will be un-deleted with all of the same settings it had before it was deleted, see [NotificationManagerCompat.deleteNotificationChannel](https://developer.android.com/reference/androidx/core/app/NotificationManagerCompat#deleteNotificationChannel(java.lang.String))
+Deleting a channel also removes its associated notifications. If you create a new channel with the same id, the deleted channel will be un-deleted with all of the same settings it had before it was deleted, see [NotificationManagerCompat.deleteNotificationChannel](https://developer.android.com/reference/androidx/core/app/NotificationManagerCompat#deleteNotificationChannel(java.lang.String))
 
 ### getDefaults
 
@@ -1108,7 +1319,9 @@ Possible status codes:
 Checks if the app has permissions to post notifications.
 
 ```js
-cordova.plugins.notification.local.hasPermission(function (granted) { ... });
+cordova.plugins.notification.local.hasPermission((granted) => {
+    console.log('App notification permission:', granted);
+});
 ```
 
 ### iOSClearBadge
@@ -1152,13 +1365,16 @@ Opens the notifications settings of the app on Android 8 and newer. This method 
 Request permission to post notifications. This is called automatically by the plugin when scheduling notifications, but you can also request it manually before scheduling notifications:
 
 ```js
-cordova.plugins.notification.local.requestPermission(function (granted) { ... });
+cordova.plugins.notification.local.requestPermission((granted) => {
+    console.log('App notification permission:', granted);
+});
 ```
 
-If this method is called, a dialog will be shown to the user to ask for the permission.
+The system may show a permission dialog, depending on the platform and the user's previous choice. The callback receives whether permission is granted.
 
-<img width="240" src="images/ios-request-permission.png">
-<img width="240" src="images/android-request-permission.png">
+| Android | iOS |
+| :------ | :-- |
+| <img width="240" src="images/android-request-permission.png" alt="Android notification permission dialog"> | <img width="240" src="images/ios-request-permission.png" alt="iOS notification permission dialog"> |
 
 The user can still allow/deny the permission through the system settings.
 
@@ -1166,7 +1382,7 @@ To check if permissions are granted, without calling this method, use [hasPermis
 
 ### setDefaults
 
-Changes default values of properties.
+Changes property defaults for subsequent notifications. Existing notifications and Android channel settings are not changed.
 
 Example:
 
@@ -1177,14 +1393,27 @@ cordova.plugins.notification.local.setDefaults({
 });
 ```
 
-## Properties
+<a id="properties-1"></a>
+## Property Reference
 
-### Changed properties
-List of changed properties on newer plugin versions.
+Pass notification properties to [`schedule()`](#schedule) or [`update()`](#methods). Use [setDefaults](#setdefaults) to change defaults for subsequent calls.
 
-#### Changes since version `1.1.0`
+| Options | Where to look |
+| :------ | :------------ |
+| Shared by Android and iOS | [Common properties](#common-properties) |
+| Android only | [Android properties](#android-properties) |
+| iOS only | [iOS properties](#ios-properties) |
+| Detailed behavior and examples | [Available properties](#available-properties) |
+| Migration from older versions | [Changed properties](#changed-properties) |
 
-There were some properties renamed. You can still use the old ones, but you will get a deprecation warning in the log and they will be removed in future versions.
+For complete usage examples, see [Notification examples](#notification-examples).
+
+### Changed Properties
+Use this section when migrating code or examples written for older plugin versions.
+
+#### Changes Since Version `1.1.0`
+
+The following properties were renamed. Old names are still accepted with a deprecation warning, but may be removed in a future version. Use the new names in new code.
 
 | Old Property            | New Property                |
 | :---------------------- | :-------------------------- |
@@ -1207,8 +1436,8 @@ There were some properties renamed. You can still use the old ones, but you will
 | lockscreen              | androidLockscreen           |
 | mediaSession            | *Property was removed*      |
 | onlyAlertOnce           | androidOnlyAlertOnce        |
-| prio                    | Use `androidChannelImportance`, `androidAlarmType` and `androidAllowWhileIdle` instead. |
-| priority                | Use `androidChannelImportance`, `androidAlarmType` and `androidAllowWhileIdle` instead. |
+| prio                    | Use [`androidChannelImportance`](#property-androidchannelimportance), [`androidAlarmType`](#property-androidalarmtype) and [`androidAllowWhileIdle`](#property-androidallowwhileidle) instead. |
+| priority                | Use [`androidChannelImportance`](#property-androidchannelimportance), [`androidAlarmType`](#property-androidalarmtype) and [`androidAllowWhileIdle`](#property-androidallowwhileidle) instead. |
 | progressBar             | androidProgressBar          |
 | smallIcon               | androidSmallIcon            |
 | sticky                  | androidOngoing              |
@@ -1234,27 +1463,27 @@ to
 The property `androidProgressBar.enabled` is not supported anymore.
 Just set `androidProgressBar: null` to disable the progressbar.
 
-##### Changes on sound
-The property `sound` takes no longer additionally a boolean, now only a string, which points to a sound file.
+##### Changes on Sound
+The property [`sound`](#property-sound) takes no longer additionally a boolean, now only a string, which points to a sound file.
 - The value `sound: true` is replaced with `sound: 'default'`
 - The value `sound: false` is replaced with `sound: null`
 
-### Changes since version `1.1.1`
+### Changes Since Version `1.1.1`
 
-There were some properties renamed. You can still use the old ones, but you will get a deprecation warning in the log and they will be removed in future versions.
+The following properties were renamed. Old names are still accepted with a deprecation warning, but may be removed in a future version. Use the new names in new code.
 
 | Old Property            | New Property                  | Reason                  |
 | :---------------------- | :---------------------------- | ----------------------- |
 | vibrate                 | androidChannelEnableVibration | The vibration cannot be controlled on iOS. So this is a Android only property and can only be set on a channel. See [androidChannelEnableVibration](#property-androidchannelenablevibration)|
 
-### Common properties
+### Common Properties
 
 These properties can be used on all platforms, but some may behave differently on each platform.
 
 | Property               | Default           | Comment                   |
 | :----------------------| :-----------------|:--------------------------|
 | [actions](#actions)    | `[]`              | Actions of a notification |
-| [attachments](#property-attachments) | `[]`              | List of resources, to attach to the notification. |
+| [attachments](#property-attachments) | `[]`              | Files to attach to the notification. See the platform-specific formats and examples below. |
 | [badgeNumber](#property-badgenumber) | Android: `1`, iOS: `-1` | Sets the badge for the application. The behaviour differs on Android and iOS.  |
 | data                   | `null`            | Custom data for the notification. Can be used, when the notification is send back to the app, e.g. by clicking on it. |
 | [id](#property-id)     | `1`               | ID of a notification as number. |
@@ -1266,22 +1495,22 @@ These properties can be used on all platforms, but some may behave differently o
 | title                 | `""` (Sets the app name)               | Title of the notification. Has to be a String. If it is empty, the app name will be used. |
 | [trigger](#triggers)  | `{at: new Date(), type : "calendar"}`| Notifications may trigger depend on time or location (iOS only) |
 
-### Android properties
+### Android Properties
 
-These properties are only available on Android.
+These properties are only available on Android. On Android 8 and newer, `androidChannel*` settings configure the channel when it is first created; they do not override an existing channel. See [Android channels](#android-channels).
 
 | Property               | Default           | Comment                   |
 | :----------------------| :-----------------|:--------------------------|
 | [androidAlarmType](#property-androidalarmtype) | `RTC_WAKEUP` |              |
 | [androidAllowWhileIdle](#property-androidallowwhileidle) | `false` | Alarm will be allowed to execute even when the system is in low-power idle (a.k.a. doze) modes. |
-| androidAutoCancel      | `true`            | Make this notification automatically dismissed when the user touches it |
-| [androidChannelGroupId](#channel-groups) | `null` | Assign the channel to an existing channel group. Android 8 and newer. Create the group first with `createChannelGroup()`. This is separate from `androidGroup`, which groups posted notifications. |
+| androidAutoCancel      | `true`            | Automatically dismiss the notification when the user taps it. |
 | androidChannelDescription | `null`            | Sets the `description` of a [notification channel](#notification-channels). |
-| [androidChannelEnableLights](#property-androidchannelenablelights) | `false` | Can be `true` or `false`and sets whether notifications posted to a [notification channel](#android-channels) should display notification lights, on devices that support that feature. |
+| [androidChannelEnableLights](#property-androidchannelenablelights) | `false` | Can be `true` or `false` and sets whether notifications posted to a [notification channel](#android-channels) should display notification lights, on devices that support that feature. |
 | [androidChannelEnableVibration](#property-androidchannelenablevibration) | `false`            | Enables the vibration of a channel. |
+| [androidChannelGroupId](#channel-groups) | `null` | Assign the channel to an existing channel group. Android 8 and newer. Create the group first with [`createChannelGroup()`](#createchannelgroup). This is separate from [`androidGroup`](#grouping), which groups posted notifications. |
 | [androidChannelId](#property-androidchannelid) | `default_channel` | Specifies the channel id to be posted on. |
 | androidChannelImportance | `IMPORTANCE_DEFAULT` | Sets the [importance](#property-androidchannelimportance) of a [notification channel](#notification-channels) |
-| androidChannelName     | `Default channel` | Set the `channelName` for the notification to be posted on. See [Android Notification Channels](#notification-channels) for more information. |
+| androidChannelName     | `Default channel` | Sets the user-visible name of the notification channel. See [Android Notification Channels](#notification-channels) for more information. |
 | androidChannelSoundUsage | `5` (=USAGE_NOTIFICATION) | Sets the [androidChannelSoundUsage](#property-androidchannelsoundusage) of a [notification channel](#notification-channels). |
 | [androidColor](#property-androidcolor) | `null`            | The notification background color for the small icon in the notification style. |
 | [androidGroup](#grouping) | `null`            | Set this notification to be part of a group of notifications sharing the same key. Grouped notifications may display in a cluster or stack on devices which support such rendering. To make this notification the summary for its group, also call setGroupSummary(boolean). A sort order can be specified for group members by using setSortKey(String) (not implemented yet). Calls [Notification.Builder#setGroup(java.lang.String)](https://developer.android.com/reference/android/app/Notification.Builder#setGroup(java.lang.String)) |
@@ -1303,7 +1532,7 @@ These properties are only available on Android.
 | androidDefaults        | `0`               | Android 7 only. Sets the default notification options that will be used only on Android 7. Bitwise-or of: DEFAULT_SOUND, DEFAULT_VIBRATE, DEFAULT_LIGHTS. |
 | led                    | `false`           | Android 7 only. Can be a Hex-String like `#FF00FF` or `{color: '#FF00FF', on: 500, off: 500}` and sets the led of a notification. Replaced by [androidChannelEnableLights](#property-androidchannelenablelights). |
 
-### iOS properties
+### iOS Properties
 
 These properties are only available on iOS.
 
@@ -1311,16 +1540,16 @@ These properties are only available on iOS.
 | :--------------------------------------- | :-------------------- | :------------------------ |
 | [iOSForeground](#property-iosforeground) | `true`                | Displays a notification banner, when app is in foreground. |
 
-#### Some notes:
-- A progressbar is natively not supported by iOS, [see Stackoverflow](https://stackoverflow.com/questions/48500532/progress-view-in-local-notification/48500734#48500734)
-- The vibration cannot be turned off separately. It can only be turned off, if no sound is set.
+#### iOS Limitations
 
-### Default values
+- iOS does not support notification progress bars.
+- Vibration cannot be turned off separately from sound. Set `sound: null` to disable both.
 
-Default values for the properties can be get by [getDefaults](#getdefaults).
-Values can be changed by [setDefaults](#setdefaults)
+### Default Values
 
-### Available properties
+Read the current defaults synchronously with [getDefaults](#getdefaults). Change defaults for subsequent notifications with [setDefaults](#setdefaults). This does not modify existing notifications or reset existing Android channel settings.
+
+### Available Properties
 
 #### Property `androidAllowWhileIdle`
 Default: `false`
@@ -1346,7 +1575,7 @@ If the alarm should be scheduled on a specific time or in relevance to the time,
 #### Property `androidChannelEnableLights`
 Default: `false`
 
-Can be `true` or `false`and sets whether notifications posted to a [notification channel](#notification-channels) should display notification lights, on devices that support that feature.
+Can be `true` or `false` and sets whether notifications posted to a [notification channel](#notification-channels) should display notification lights, on devices that support that feature.
 
 Android documentation: https://developer.android.com/reference/android/app/NotificationChannel#enableLights(boolean)
 
@@ -1437,18 +1666,18 @@ Default: `null`
 Used in the following cases:
 
 1. For [NotificationCompat.InboxStyle#setSummaryText(java.lang.CharSequence)](https://developer.android.com/reference/androidx/core/app/NotificationCompat.InboxStyle#setSummaryText(java.lang.CharSequence)), when using [NotificationCompat.InboxStyle](https://developer.android.com/reference/androidx/core/app/NotificationCompat.InboxStyle), which happens, when the `text` property has line breaks.
-2. For [NotificationCompat.BigPictureStyle#setSummaryText(java.lang.CharSequence)](https://developer.android.com/reference/androidx/core/app/NotificationCompat.BigPictureStyle#setSummaryText(java.lang.CharSequence)), when [NotificationCompat.BigPictureStyle](https://developer.android.com/reference/androidx/core/app/NotificationCompat.BigPictureStyle) is used, which happens, when `attachments` are used. If `androidSummary` is not set, `text` will be used.
+2. For [NotificationCompat.BigPictureStyle#setSummaryText(java.lang.CharSequence)](https://developer.android.com/reference/androidx/core/app/NotificationCompat.BigPictureStyle#setSummaryText(java.lang.CharSequence)), when [NotificationCompat.BigPictureStyle](https://developer.android.com/reference/androidx/core/app/NotificationCompat.BigPictureStyle) is used, which happens, when [`attachments`](#property-attachments) are used. If [`androidSummary`](#property-androidsummary) is not set, `text` will be used.
 3. For [NotificationCompat.BigTextStyle#setSummaryText(java.lang.CharSequence)](https://developer.android.com/reference/androidx/core/app/NotificationCompat.BigTextStyle#setSummaryText(java.lang.CharSequence)), when [NotificationCompat.BigTextStyle](https://developer.android.com/reference/androidx/core/app/NotificationCompat.BigTextStyle) is used, which happens, if the `text` property is longer then 44 characters.
 
 #### Property `attachments`
 Default: `[]`
 
-List of resources, to attach to the notification.
+Files to attach to the notification. See the platform-specific formats and examples below.
 
 ##### Android
 Only the first entry will be used as a [bigPicture](https://developer.android.com/reference/androidx/core/app/NotificationCompat.BigPictureStyle#bigPicture(android.graphics.Bitmap)) of [NotificationCompat.BigPictureStyle](https://developer.android.com/reference/androidx/core/app/NotificationCompat.BigPictureStyle).
 
-Support resource patterns:
+Supported resource patterns:
 - [res://](#resource-pattern-res)
 - [shared://](#resource-pattern-shared)
 - [www](#resource-pattern-www)
@@ -1464,7 +1693,7 @@ The notification will be automatically unfolded in the notification center if yo
 ##### iOS
 The visual and audio attachments to display alongside the notification’s main content, see documentation of [UNMutableNotificationContent.attachments](https://developer.apple.com/documentation/usernotifications/unmutablenotificationcontent/attachments).
 
-Support resource patterns:
+Supported resource patterns:
 - `file:///` - Absolute file path
 - [res://](#resource-pattern-res) - App resource
 - [www](#resource-pattern-www)
@@ -1478,7 +1707,7 @@ Example folded and unfolded:
 
 <img width="320" src="images/ios-attachments-image-unfolded.png">
 
-##### Code example
+##### Code Example
 
 ```javascript
 cordova.plugins.notification.local.schedule({
@@ -1514,20 +1743,20 @@ Specials of this value:
 
 Sets [UNMutableNotificationContent#badge](https://developer.apple.com/documentation/usernotifications/unmutablenotificationcontent/badge).
 
-###### Clearing the badge
+###### Clearing the Badge
 You can clear the badge with the function [iOSClearBadge](#iosclearbadge).
 
-The badge will also be cleared, if you call `clearAll` or `cancelAll`.
+The badge will also be cleared, if you call [`clearAll`](#methods) or [`cancelAll`](#methods).
 
 #### Property `id`
 Default: `1`
 
-ID of a notification as number. This has to be unique for every notification. If you do not set an ID, it will default to 1. If you use an ID of a previous scheduled notification again, the previous one will be canceled.
+A numeric identifier for a notification. Use a unique ID for each notification you want to keep. Reusing an ID replaces the previous notification with that ID. Use the same ID with [`update()`](#methods), [`clear()`](#methods), or [`cancel()`](#methods) to operate on that notification.
 
 #### Property `iOSForeground`
 Default: `true`
 
-Displays a notification banner when the app is in foreground, otherwise the notification would only make a noise (sound and vibrate), change the badge, but is not shown as a banner. Since iOS 14, the notification is always displayed in the Notification Center, no matter how this option is set to be consistent with Android. Renamed from `foreground` to `iOSForeground` and changed to `true` by default in Version `1.1.0`.
+Displays a notification banner when the app is in foreground, otherwise the notification would only make a noise (sound and vibrate), change the badge, but is not shown as a banner. Since iOS 14, the notification is always displayed in the Notification Center, no matter how this option is set to be consistent with Android. Renamed from `foreground` to [`iOSForeground`](#property-iosforeground) and changed to `true` by default in Version `1.1.0`.
 
 #### Property `priority`
 Default: `0` (=PRIORITY_DEFAULT)
@@ -1538,7 +1767,7 @@ Replaced by [androidChannelImportance](#property-androidchannelimportance), whic
 
 This property had aditional functionality for the plugin, which is replaced by [androidAlarmType](#property-androidalarmtype) and [androidAllowWhileIdle](#property-androidallowwhileidle).
 
-##### Old use case
+##### Old Use Case
 When the value was [PRIORITY_MIN](https://developer.android.com/reference/android/app/Notification#PRIORITY_MIN)(=-2), the alarm was scheduled with [RTC](https://developer.android.com/reference/android/app/AlarmManager#RTC).
 This can now be achieved by setting [androidAlarmType](#property-androidalarmtype) to `RTC` and [androidAllowWhileIdle](#property-androidallowwhileidle) to false.
 
@@ -1573,21 +1802,21 @@ The system looks in the following folders for the file:
 
 See documentation [UNNotificationSound#soundNamed](https://developer.apple.com/documentation/usernotifications/unnotificationsound/init(named:)?language=objc#Discussion).
 
-### Resource resolving
+### Resource Resolving
 
-If a property can take a resource, the following patterns could be used. Not all patterns are available for every property.
+For properties that accept a file or resource, use one of the patterns below. Supported patterns vary by property and platform; check the property description before choosing a path.
 
-#### Resource pattern `file://`
+#### Resource Pattern `file://`
 Example: `file://myImage.png`
 
 Looks for a file in the `www` folder. `file://myImage.png` is equivalent to `www/myImage.png`.
 
-#### Resource pattern `www/`
+#### Resource Pattern `www/`
 Example: `www/myImage.png`
 
 Looks for a file in the `www` folder.
 
-#### Resource pattern `res://`
+#### Resource Pattern `res://`
 Example: `res://myImage.png`
 
 Defines a resource for Android or iOS. In Android it looks in the app's `res` folder, in iOS it looks for a file in the root of the app package.
@@ -1599,11 +1828,11 @@ The property, which you use, defines, in which subfolder of `res` the resource s
 - For a graphic: `drawable` and `mipmap`
 - For a sound: `raw`
 
-The plugin trys first to get the resource from you app package, if it does not find one there, it trys to get it from the [system resources](https://developer.android.com/reference/android/content/res/Resources#getSystem()).
+The plugin first looks in your app package. If the resource is not found, it checks the [system resources](https://developer.android.com/reference/android/content/res/Resources#getSystem()).
 
 If you want to use a system resource, you have to use a valid resource identifier, which you can look for in [Android Code Search](https://cs.android.com/android/platform/superproject/main/+/main:frameworks/base/core/res/res/). An example would be [ic_popup_reminder](https://cs.android.com/android/platform/superproject/main/+/main:frameworks/base/core/res/res/drawable-mdpi/ic_popup_reminder.png), which you would set with `res://ic_popup_reminder`.
 
-To make files files available in the `res` directory, you can use the [resource-file](https://cordova.apache.org/docs/en/12.x/config_ref/#resource-file) tag in `config.xml` like:
+To make files available in the `res` directory, you can use the [resource-file](https://cordova.apache.org/docs/en/12.x/config_ref/#resource-file) tag in `config.xml` like:
 
 ```xml
 <platform name="android">
@@ -1649,7 +1878,7 @@ The directory structure for the example would be:
 ...
 ```
 
-#### Resource pattern `shared://`
+#### Resource Pattern `shared://`
 Example: `shared://myImage.png`
 
 Android only.
@@ -1657,6 +1886,56 @@ Android only.
 ##### Android
 
 A shared file in `[Installed-App-Path]/files/shared_files`. This is necessary to get useable Uris for asset files, which are the files of the `www` directory. You can also use the `shared_files` directory, to store files created on runtime. To access the directory, you can use [cordova.file.dataDirectory](https://github.com/apache/cordova-plugin-file#where-to-store-files) of the plugin [cordova-plugin-file](https://github.com/apache/cordova-plugin-file) and write to the folder `shared_files`. The folder `shared_files` will be created on plugin initialization.
+
+## Upgrade Notice
+
+### Version 0.9.0-beta.3 (13.02.2018)
+
+- Last version which supports `cordova-android` older than `13.0.0` and supports minimum `cordova-android` version `6.0.0` which is Android version `4.1`
+- Last version which supports the Windows platform
+
+### Version 1.0.0 (17.08.2024)
+
+- Removed Windows platform
+- Support for Android 12-14 and uses AndroidX
+- Raised minimum `cordova-android`version from `6.0.0` to `13.0.0`, which raised the minimum Android version from `4.1` `SDK 16` to `7.0` `SDK 24`
+- Raised minimum `cordova-ios` version from `4.3.0` to `7.0.0`
+- Raised minimum Cordova version from `3.6.0` to `12.0.0`
+- Raised minimum `cordova-plugin-device` version from `2.0.0` to `3.0.0`
+
+### Updates in Version 1.1.0 (23.12.2024)
+
+- Proper handling of Android channels
+- Properties were renamed for the Android platform, see [Changed properties](#changes-since-version-110).
+
+#### Android
+
+The [Default channel](#default-channel) id was changed from `default-channel-id` to `default_channel`. If you upgrade to this version and schedule notifications, there will be two channels from then on, the old one and the new one. You can remove the old one with [deleteChannel](#deletechannel).
+
+#### iOS
+
+[iOSForeground](#property-iosforeground) is `true` by default
+
+### Updates in Version 1.1.1
+
+#### Android
+
+The property `vibrate` was renamed to [androidChannelEnableVibration](#property-androidchannelenablevibration).
+
+#### iOS
+
+A notification will be always showed in the notification center like on Android. Happens also if [iOSForeground](#property-iosforeground) is `false`.
+
+### Updates in Version 1.1.4
+
+#### Android
+
+Notifications with an old `trigger.at` date will be shown when you schedule them. Before they were ignored.
+
+### Updates in Version 1.1.8
+
+- Notifications with `trigger.at` date more than 5 seconds in the past will be ignored. iOS did always ignore passed notifications.
+- If no [id](#property-id) of a notification is set, it will default to `1` instead of `0`.
 
 ## License
 
@@ -1666,6 +1945,6 @@ Made with :yum: from Leipzig
 
 Continued by Manuel Beck since 2024
 
-© 2013-2023 appPlant GmbH (Company does not exists anymore)
+© 2013-2023 appPlant GmbH (Company no longer exists)
 
 © 2024-2026 [Manuel Beck](https://manuelbeck.software)
