@@ -28,7 +28,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 
-import de.appplant.cordova.plugin.localnotification.Notification;
+import de.appplant.cordova.plugin.localnotification.LocalNotificationRequest;
 
 /**
  * The clear intent receiver is triggered when the user clears a
@@ -47,11 +47,11 @@ public class ClearReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         Log.d(TAG, "Notification cleared, extras=" + intent.getExtras());
-        Notification notification = Notification.getFromSharedPreferences(context, intent.getIntExtra(Notification.EXTRA_ID, -1));
+        LocalNotificationRequest notification = LocalNotificationRequest.getFromSharedPreferences(context, intent.getIntExtra(LocalNotificationRequest.EXTRA_ID, -1));
 
         // Notification not found for id in SharedPreferences
         if (notification == null) {
-            Log.w(TAG, "Notification not found for id, doing nothing, id=" + intent.getIntExtra(Notification.EXTRA_ID, -1));
+            Log.w(TAG, "Notification not found for id, doing nothing, id=" + intent.getIntExtra(LocalNotificationRequest.EXTRA_ID, -1));
             return;
         }
 

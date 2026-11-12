@@ -65,12 +65,12 @@ import de.appplant.cordova.plugin.localnotification.trigger.TriggerHandlerEvery;
 import de.appplant.cordova.plugin.localnotification.util.AssetUtil;
 
 /**
- * Wrapper class around OS notification class. Handles basic operations
- * like show, delete, cancel for a single local notification instance.
+ * A local notification request with its options, trigger, and stored lifecycle state.
+ * Schedules and presents the request using the Android notification APIs.
  */
-public class Notification {
+public class LocalNotificationRequest {
 
-    private static final String TAG = "Notification";
+    private static final String TAG = "LocalNotificationRequest";
 
     // Used to differ notifications by their life cycle state
     public enum Type {
@@ -97,7 +97,7 @@ public class Notification {
      * @param options Parsed notification options.
      * @param builder Pre-configured notification builder.
      */
-    public Notification(Context context, JSONObject options) {
+    public LocalNotificationRequest(Context context, JSONObject options) {
         this.context = context;
         this.options = new Options(context, options);
         OptionsTrigger optionsTrigger = this.options.getOptionsTrigger();
@@ -225,7 +225,7 @@ public class Notification {
         }
 
         // Create the channel if it does not exist.
-        Manager.createChannel(context, options);
+        new LocalNotificationChannels(context).create(options);
 
         // Store notification data for restoration
         // Needed for ClickActivity and ClearReceiver
@@ -471,7 +471,7 @@ public class Notification {
      * Gets a stored notification from the {@link SharedPreferences} by id.
      * If the notification does not exists, null will be returned.
      */
-    public static Notification getFromSharedPreferences(Context context, int notificationId) {
+    public static LocalNotificationRequest getFromSharedPreferences(Context context, int notificationId) {
         String optionsJSONString = Manager.getSharedPreferences(context).getString(
             getSharedPreferencesKeyOptions(notificationId), null);
 
@@ -488,7 +488,7 @@ public class Notification {
         
         try {
             // Parse options string to JSONObject
-            Notification notification = new Notification(context, new JSONObject(optionsJSONString));
+            LocalNotificationRequest notification = new LocalNotificationRequest(context, new JSONObject(optionsJSONString));
 
             // Restore state of dateTrigger
             // Get occurrence
@@ -599,7 +599,7 @@ public class Notification {
         if (options.isSilent()) return null;
 
         Bundle extras = new Bundle();
-        extras.putInt(Notification.EXTRA_ID, options.getId());
+        extras.putInt(LocalNotificationRequest.EXTRA_ID, options.getId());
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, options.getAndroidChannelId())
             .setExtras(extras)
@@ -791,7 +791,7 @@ public class Notification {
     private void setDeleteIntent(NotificationCompat.Builder builder) {
         Intent intent = new Intent(context, ClearReceiver.class)
             .setAction(options.getId().toString())
-            .putExtra(Notification.EXTRA_ID, options.getId());
+            .putExtra(LocalNotificationRequest.EXTRA_ID, options.getId());
 
         builder.setDeleteIntent(PendingIntent.getBroadcast(
             context, 0, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
@@ -804,7 +804,7 @@ public class Notification {
     private void setContentIntent(NotificationCompat.Builder builder) {
         // Route content tap to a transparent activity to avoid trampoline and still run plugin logic
         Intent clickIntent = new Intent(context, ClickActivity.class)
-            .putExtra(Notification.EXTRA_ID, options.getId())
+            .putExtra(LocalNotificationRequest.EXTRA_ID, options.getId())
             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
 
         PendingIntent contentPendingIntent = PendingIntent.getActivity(
@@ -834,7 +834,7 @@ public class Notification {
     private void addAction(NotificationCompat.Builder builder, Action action) {
         // Route content tap to a transparent activity to avoid trampoline and still run plugin logic
         Intent actionClickIntent = new Intent(context, ClickActivity.class)
-            .putExtra(Notification.EXTRA_ID, options.getId())
+            .putExtra(LocalNotificationRequest.EXTRA_ID, options.getId())
             .putExtra(Action.EXTRA_ID, action.getId())
             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
 

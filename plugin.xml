@@ -251,7 +251,11 @@
             target-dir="src/de/appplant/cordova/plugin/localnotification" />
 
         <source-file
-            src="src/android/Notification.java"
+            src="src/android/LocalNotificationChannels.java"
+            target-dir="src/de/appplant/cordova/plugin/localnotification" />
+
+        <source-file
+            src="src/android/LocalNotificationRequest.java"
             target-dir="src/de/appplant/cordova/plugin/localnotification" />
 
         <source-file
