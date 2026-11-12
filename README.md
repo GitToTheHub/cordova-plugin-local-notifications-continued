@@ -430,6 +430,10 @@ You can read everything about it in the [Android documentatation](https://develo
 
 ### Alarm Rescheduling
 
+On Android, restoration runs on a background worker. Before restoring alarms, the plugin removes expired final occurrences that cannot be displayed because notifications are disabled for the app, their channel, or their channel group. These records otherwise cannot be cleared by clicking or dismissing a notification. Cleanup is written in one batch.
+
+Future notifications and recurring requests with remaining occurrences are retained even when their channel is currently blocked. Overdue notifications that can still be displayed are restored as before. A missing channel is not treated as blocked, since scheduling can recreate it.
+
 #### App Update
 Android removes all alarms when the app is updated. The plugin reschedules all alarms by a [BroadcastReceiver](https://developer.android.com/develop/background-work/background-tasks/broadcasts) listening to [ACTION_MY_PACKAGE_REPLACED](https://developer.android.com/reference/android/content/Intent#ACTION_MY_PACKAGE_REPLACED).
 

@@ -45,3 +45,12 @@ The final iOS 26.5 end-to-end check used the unchanged app Promise wrappers and 
 `promises.test.js` exercises every callback-based asynchronous method without callbacks, using asynchronous bridge completions. It verifies resolution, native rejection, validation rejection, normal false/null results, unsupported-platform fallbacks, scheduling options, get() versus get([]), and legacy callback scope/return values.
 
 The Promise API also passed native end-to-end checks in the disposable Abfuhrkalender app copy on Android 16 and iOS 26.5: scheduling, updating, fetching one/all, cancellation, validation rejection, and rejection from a native failure. Android used a genuinely missing channel group; iOS used a controlled NSError injected into addNotificationRequest while leaving the plugin and Cordova bridge real. Existing application callback wrappers remained compatible. Both platform builds succeeded.
+
+
+## Android Restoration Regression Test
+
+`restore-receiver.test.js` compiles the production `RestoreReceiver` against small Android boundary doubles and runs it on the JVM. It requires a JDK; this test is skipped when `javac` is unavailable. The other JavaScript tests do not require a JDK.
+
+It verifies off-main-thread preference loading and scheduling, one broadcast completion, bulk cleanup before surviving requests are stored, and one channel-settings lookup per channel. Its 1,001-entry backlog case retains future, repeating, overdue displayable, missing-channel, missing-date, and unreadable-settings requests. App-level blocking, channel/group blocking, per-request failures, all three restoration broadcasts, and unrelated/null intents are covered.
+
+Native validation on Android 16 used a disposable app copy with 1,005 persisted requests: 1,001 expired one-time requests on a blocked channel plus future, repeating, overdue enabled, and missing-channel cases. Reinstalling the APK and rebooting the emulator each removed exactly 1,001 requests and retained the four control requests. With app-level notifications disabled, exactly 1,003 expired requests were removed and both future/repeating requests remained. Receiver logs confirmed that preference loading and restoration ran on a worker thread. No ANR or native exception occurred in these runs.
