@@ -44,6 +44,7 @@
     <!-- js -->
     <js-module src="www/local-notification.js" name="LocalNotification">
         <clobbers target="cordova.plugins.notification.local" />
+        <clobbers target="LocalNotifications" />
     </js-module>
 
     <!-- ios -->
