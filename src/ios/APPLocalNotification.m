@@ -117,38 +117,15 @@
 - (void) schedule:(CDVInvokedUrlCommand*)command
 {
     [self.commandDelegate runInBackground:^{
-        for (NSDictionary* options in command.arguments) {
-            [self scheduleNotification:[[APPNotificationContent alloc] initWithOptions:options]];
-        }
-
-        [self hasPermission:command];
+        [self processNotifications:command.arguments atIndex:0 updating:NO command:command];
     }];
 }
 
-/**
- * Update notifications.
- */
+/** Update existing notifications, waiting for each native result. */
 - (void) update:(CDVInvokedUrlCommand*)command
 {
-    NSArray* notifications = command.arguments;
-
     [self.commandDelegate runInBackground:^{
-        for (NSDictionary* options in notifications) {
-            NSNumber* id = [options objectForKey:@"id"];
-            UNNotificationRequest* notification;
-
-            notification = [self->_center getNotificationWithId:id];
-
-            if (!notification)
-                continue;
-
-            [self updateNotification:[notification copy]
-                         withOptions:options];
-
-            [self fireEvent:@"update" notification:notification];
-        }
-
-        [self hasPermission:command];
+        [self processNotifications:command.arguments atIndex:0 updating:YES command:command];
     }];
 }
 
@@ -339,7 +316,11 @@
 {
     [_center requestAuthorizationWithOptions:(UNAuthorizationOptionBadge | UNAuthorizationOptionSound | UNAuthorizationOptionAlert)
                            completionHandler:^(BOOL granted, NSError* e) {
-                               [self hasPermission:command];
+                               if (e) {
+                                   [self reportError:e command:command context:@"requestPermission"];
+                               } else {
+                                   [self hasPermission:command];
+                               }
                            }
     ];
 }
@@ -416,36 +397,56 @@
 /**
  * Schedule the local notification.
  */
-- (void) scheduleNotification:(APPNotificationContent*)appNotificationContent
+- (void) processNotifications:(NSArray*)notifications
+                     atIndex:(NSUInteger)index
+                    updating:(BOOL)updating
+                     command:(CDVInvokedUrlCommand*)command
 {
-    __weak APPLocalNotification* weakSelf = self;
-    UNNotificationRequest* request = appNotificationContent.request;
+    // Skip unknown update IDs, matching the existing API behavior.
+    NSMutableDictionary* options = nil;
+    while (index < notifications.count) {
+        NSDictionary* supplied = notifications[index];
+        index++;
+        if (updating) {
+            UNNotificationRequest* existing = [_center getNotificationWithId:supplied[@"id"]];
+            if (!existing) continue;
+            options = [existing.content.userInfo mutableCopy];
+            [options addEntriesFromDictionary:supplied];
+            options[@"updatedAt"] = [NSDate date];
+        } else {
+            options = [supplied mutableCopy];
+        }
+        break;
+    }
+    if (!options) {
+        [self hasPermission:command];
+        return;
+    }
+
+    APPNotificationContent* content = [[APPNotificationContent alloc] initWithOptions:options];
+    UNNotificationRequest* request = content.request;
     NSString* event = [request wasUpdated] ? @"update" : @"add";
-    
-    NSLog(@"Schedule notification, event=%@, trigger=%@, options=%@", event, request.trigger, appNotificationContent.options);
-    
-    [_center addNotificationRequest:request
-              withCompletionHandler:^(NSError* e) {
-                __strong APPLocalNotification* strongSelf = weakSelf;
-                [strongSelf fireEvent:event notification:request];
-              }
-    ];
+    NSLog(@"Schedule notification, event=%@, trigger=%@, options=%@", event, request.trigger, options);
+    [_center addNotificationRequest:request withCompletionHandler:^(NSError* error) {
+        if (error) {
+            NSString* context = [NSString stringWithFormat:@"%@ notificationId=%@",
+                                 updating ? @"update" : @"schedule", request.identifier];
+            [self reportError:error command:command context:context];
+            return;
+        }
+        [self fireEvent:event notification:request];
+        [self processNotifications:notifications atIndex:index updating:updating command:command];
+    }];
 }
 
-/**
- * Update the local notification.
- * @param notification The notification to update.
- * @param newOptions The options to update.
- */
-- (void) updateNotification:(UNNotificationRequest*)notification
-                withOptions:(NSDictionary*)newOptions
+/** Log full native diagnostics and send one error result to JavaScript. */
+- (void) reportError:(NSError*)error command:(CDVInvokedUrlCommand*)command context:(NSString*)context
 {
-    NSMutableDictionary* options = [notification.content.userInfo mutableCopy];
-
-    [options addEntriesFromDictionary:newOptions];
-    [options setObject:[NSDate date] forKey:@"updatedAt"];
-
-    [self scheduleNotification:[[APPNotificationContent alloc] initWithOptions:options]];
+    NSLog(@"LocalNotification: %@ failed, domain=%@, code=%ld, userInfo=%@",
+          context, error.domain, (long)error.code, error.userInfo);
+    CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR
+                                             messageAsString:error.localizedDescription];
+    [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
 }
 
 #pragma mark -

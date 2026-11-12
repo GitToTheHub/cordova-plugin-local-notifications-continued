@@ -15,3 +15,26 @@ The integration script does not test blocked channel groups or the Android 7 fal
 ## Channel Group Integration Test
 
 Load `android/channel-groups.js` in the disposable Cordova app instead of `android/get-channel.js`. On Android 8 or newer it checks group creation, queries, renaming, channel assignment, assigning an existing ungrouped channel without changing importance, preventing channel moves, and cascade deletion. Success logs `CHANNEL_GROUP_NATIVE_ALL_PASS`. It creates and deletes timestamped `group_test_` groups and channels. Group blocking through system settings requires a separate manual test on Android 9 or newer.
+
+## Native Error Callback Integration Test
+
+Load `android/error-callback.js` in the disposable Cordova app with notification permission granted. It deliberately references a missing group to verify the error callback for channel creation and scheduling (with and without the automatic permission check), the success/error callback argument order, and absence of failed notification/channel side effects. It also checks that an invalid alarm type reaches the error callback. Success logs `ERROR_CALLBACK_NATIVE_ALL_PASS`. It also invokes an operation without an error handler; verify the JavaScript console reports `LocalNotification: createChannel failed` and the app stays running.
+
+## Existing Application Compatibility Check
+
+The error-callback change was checked against the unchanged `NotificationPluginPromises` wrappers in the local Abfuhrkalender app. Android and iOS JavaScript bridge calls match plugin 1.2.3 except for plugin/version metadata. Legacy object scopes and denied-permission results remain supported.
+
+A disposable copy of the app builds for Android with only its plugin dependency replaced. On an Android 16 emulator, the app initializes, its original permission and scheduling Promise wrappers resolve, the scheduled notification can be queried and canceled, and a missing channel group reaches the new native error callback.
+
+This does not cover every app workflow or a physical iOS device run. A Promise wrapper that only supplies a success callback remains pending after a native error; the plugin logs the error but cannot reject a Promise it does not own.
+
+## iOS Native Error Probe
+
+`ios/error-callback-probe.m` is a test-only simulator library. It loads the real plugin class from a debug host app and substitutes only the notification center and command delegate. It checks asynchronous two-item scheduling, stopping a batch at its second failed request, updating an existing ID while skipping a missing ID, forwarding authorization errors, and an empty batch. Injected `NSError` values exercise callback behavior deterministically; they are not actual OS failures.
+
+Build with the simulator SDK, ARC, Foundation, UIKit, UserNotifications, and the host Cordova include directory. Load it only into a disposable simulator app with `SIMCTL_CHILD_DYLD_INSERT_LIBRARIES` and `xcrun simctl launch --console`. Success logs `IOS_NATIVE_PROBE_ALL_PASS`. Never include this probe in a distributed app.
+
+The Abfuhrkalender app copy builds for iOS Simulator and initializes on iOS 26.5 with the modified native plugin. The original app source remains unchanged.
+
+
+The final iOS 26.5 end-to-end check used the unchanged app Promise wrappers and the real notification center: permission check, scheduling, querying, updating, delivery, and cancellation all passed. In a separate controlled-error run, an injected native NSError crossed the real Cordova bridge: the legacy Promise stayed pending, exactly one error was logged, the app remained responsive, and an explicit error callback received the message. Android 16 showed the same behavior for a real missing-channel-group error. An invalid native Android trigger also reaches the error callback instead of escaping the worker thread.
