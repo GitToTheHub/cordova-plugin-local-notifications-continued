@@ -48,7 +48,16 @@ import de.appplant.cordova.plugin.localnotification.LocalNotificationRequest;
 /**
  * This class is triggered, when the system has cleared the alarms and notifications,
  * e.g. because of a device reboot, app update or granting the SCHEDULE_EXACT_ALARM permission.
- * The alarms and notifications needs to be restored.
+ * Android invokes this manifest-registered receiver on the application's main thread,
+ * even when no Activity is visible. It does not pass through Cordova's thread pool,
+ * which handles plugin calls originating from JavaScript.
+ *
+ * Restore persisted requests on our own worker to keep preference reads/writes and
+ * alarm scheduling off the main thread. goAsync() keeps the broadcast active after
+ * onReceive() returns; it neither switches threads nor removes the broadcast timeout.
+ * Keep the work bounded and finish the pending result when the worker completes.
+ *
+ * @see <a href="https://developer.android.com/reference/android/content/BroadcastReceiver#goAsync()">BroadcastReceiver.goAsync()</a>
  */
 public class RestoreReceiver extends BroadcastReceiver {
 
@@ -67,12 +76,14 @@ public class RestoreReceiver extends BroadcastReceiver {
         }
 
         Log.d(TAG, "Received action: " + action);
+        // Retain the broadcast result; the executor below performs the actual thread switch.
         PendingResult pendingResult = goAsync();
         Context appContext = context.getApplicationContext();
         RESTORE_EXECUTOR.execute(() -> {
             try {
                 restore(appContext);
             } finally {
+                // Release the broadcast even if restoration fails.
                 pendingResult.finish();
             }
         });
