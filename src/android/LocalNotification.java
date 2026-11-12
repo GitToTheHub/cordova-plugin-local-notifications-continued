@@ -439,14 +439,18 @@ public class LocalNotification extends CordovaPlugin {
             groupBlocked = group != null && group.isBlocked();
         }
 
+        boolean blocked = channel.getImportance() == NotificationManager.IMPORTANCE_NONE;
+        boolean appNotificationsEnabled = manager.areNotificationsEnabled();
+
         try {
             JSONObject result = new JSONObject();
             result.put("id", channel.getId());
             result.put("name", channel.getName().toString());
             result.put("description", channel.getDescription() == null ? JSONObject.NULL : channel.getDescription());
             result.put("importance", channel.getImportance());
-            result.put("blocked", channel.getImportance() == NotificationManager.IMPORTANCE_NONE);
-            result.put("appNotificationsEnabled", manager.areNotificationsEnabled());
+            result.put("enabled", appNotificationsEnabled && !blocked && !groupBlocked);
+            result.put("blocked", blocked);
+            result.put("appNotificationsEnabled", appNotificationsEnabled);
             result.put("groupId", channel.getGroup() == null ? JSONObject.NULL : channel.getGroup());
             result.put("groupBlocked", groupBlocked);
             Uri sound = channel.getSound();

@@ -8,6 +8,7 @@ document.addEventListener('deviceready', async () => {
         if (!(await new Promise(resolve => n.hasPermission(resolve)))) {
             const channel = await query('query_test_default');
             check(channel.appNotificationsEnabled === false, 'app-level blocking not reflected');
+            check(channel.enabled === false, 'app-level blocking must disable the channel');
             check(channel.blocked === false, 'app blocking must not change channel blocking');
             console.log('GET_CHANNEL_NATIVE_PASS app-disabled');
             return;
@@ -20,6 +21,7 @@ document.addEventListener('deviceready', async () => {
         const channel = await query('query_test_default');
         check(channel.id === 'query_test_default', 'wrong ID');
         check(channel.importance === 3 && channel.blocked === false, 'wrong default state');
+        check(channel.enabled === true, 'unblocked channel should be enabled');
         check(typeof channel.sound === 'string', 'default sound should return its system URI');
         check(channel.description === null || typeof channel.description === 'string', 'invalid description');
         check(channel.groupId === null && channel.groupBlocked === false, 'wrong group state');
@@ -29,9 +31,12 @@ document.addEventListener('deviceready', async () => {
         await create({androidChannelId: 'query_test_blocked', androidChannelName: 'Blocked test', androidChannelImportance: 'IMPORTANCE_NONE'});
         const blocked = await query('query_test_blocked');
         check(blocked.importance === 0 && blocked.blocked === true, 'blocked channel not detected');
+        check(blocked.enabled === false, 'blocked channel must not be enabled');
         console.log('GET_CHANNEL_NATIVE_PASS blocked');
         await create({androidChannelId: 'query_test_silent', androidChannelName: 'Silent test', sound: ''});
-        check((await query('query_test_silent')).sound === null, 'silent channel should return null sound');
+        const silent = await query('query_test_silent');
+        check(silent.sound === null, 'silent channel should return null sound');
+        check(silent.enabled === true, 'silent channel can still be enabled');
         console.log('GET_CHANNEL_NATIVE_PASS silent');
         await remove('query_test_deleted');
         await create({androidChannelId: 'query_test_deleted', androidChannelName: 'Deleted test'});

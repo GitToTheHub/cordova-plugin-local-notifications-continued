@@ -1015,10 +1015,8 @@ cordova.plugins.notification.local.getChannel('appointment_reminders', (channel)
         return;
     }
 
-    if (!channel.appNotificationsEnabled) {
-        console.log('Notifications are disabled for the app.');
-    } else if (channel.blocked || channel.groupBlocked) {
-        console.log('This notification channel or its group is blocked.');
+    if (!channel.enabled) {
+        console.log('Notifications are disabled for the app, channel, or channel group.');
     } else {
         console.log('Channel importance:', channel.importance);
         console.log('Configured sound:', channel.sound);
@@ -1038,6 +1036,7 @@ For an existing channel, the callback receives:
 | `name` | string | Current user-visible channel name. |
 | `description` | string or null | Channel description. |
 | `importance` | number | Current Android importance: `0` = none, `1` = minimum, `2` = low, `3` = default, `4` = high, `5` = maximum. |
+| `enabled` | boolean | Combined status: `appNotificationsEnabled && !blocked && !groupBlocked`. `true` means none of these three settings blocks notifications; it does not guarantee sound or delivery. |
 | `blocked` | boolean | `true` when the channel importance is `IMPORTANCE_NONE` (`0`). This field does not include app-level or group-level blocking. |
 | `appNotificationsEnabled` | boolean | Current app-level notification status, also checked by `hasPermission()`. |
 | `groupId` | string or null | Channel group ID, if assigned. |
