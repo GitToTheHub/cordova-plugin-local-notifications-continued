@@ -34,12 +34,16 @@ Notifications can display text, play a sound, update a badge, and offer action b
 - [Property reference](#properties-1): [common](#common-properties), [Android](#android-properties), and [iOS](#ios-properties)
 - [Upgrade notes](#upgrade-notice) and [renamed properties](#changed-properties)
 
-The channel query ([`getChannel()`](#getchannel)), `channel.enabled`, and channel-group APIs described below are available in **1.2.5-dev on GitHub**. They are not included in the 1.2.4 npm release.
+The Promise API, channel query ([`getChannel()`](#getchannel)), `channel.enabled`, and channel-group APIs described below are available in **1.2.5-dev on GitHub**. They are not included in the 1.2.4 npm release.
 
 ### Supported Platforms
 
 - Android 7.0+ (minimum version by cordova-android 13.0.0) with a minimum WebView Version 60 (Android 8 is shipped with a WebView version 58 and must be updated with Google Play Store before)
 - iOS 11.3+ (minimum version by cordova-ios 7.0.0)
+
+The examples use Promises with `async` / `await`. This syntax is supported from **Android WebView 55** and **iOS 10.3**, so it is covered by the plugin's minimum versions above. On Android, JavaScript syntax support depends on the installed WebView version, not just the Android version. See [MDN: await compatibility](https://github.com/mdn/browser-compat-data/blob/main/javascript/operators/await.json) and [WebKit: Safari 10.1 and iOS 10.3](https://webkit.org/blog/7477/new-web-features-in-safari-10-1/).
+
+Use `await` inside an `async` function, as shown in [Quick Start](#basics). The examples do not require top-level `await` (outside a function), which has different compatibility requirements.
 
 ### Installation
 
