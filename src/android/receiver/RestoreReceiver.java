@@ -40,6 +40,7 @@ import java.util.concurrent.Executors;
 
 import androidx.core.app.NotificationManagerCompat;
 import org.json.JSONObject;
+import org.json.JSONException;
 
 import de.appplant.cordova.plugin.localnotification.Manager;
 import de.appplant.cordova.plugin.localnotification.LocalNotificationChannels;
@@ -89,41 +90,31 @@ public class RestoreReceiver extends BroadcastReceiver {
         });
     }
 
+    /** Load saved requests, clean up unusable final occurrences, then restore the rest. */
     private void restore(Context context) {
         List<LocalNotificationRequest> notifications = new Manager(context).getNotificationsFromSharedPreferences();
         Log.d(TAG, "Restoring notifications, count: " + notifications.size());
+
+        notifications = removeExpiredBlockedNotifications(context, notifications);
+        restoreNotifications(notifications);
+    }
+
+    /** Complete the batched cleanup before schedule() writes any surviving requests back. */
+    private List<LocalNotificationRequest> removeExpiredBlockedNotifications(
+            Context context, List<LocalNotificationRequest> notifications) {
         LocalNotificationChannels channels = new LocalNotificationChannels(context);
         boolean appEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled();
         Map<String, Boolean> channelEnabled = new HashMap<>();
         SharedPreferences.Editor editor = Manager.getSharedPreferences(context).edit();
         List<LocalNotificationRequest> remaining = new ArrayList<>();
         Date now = new Date();
-        int removed = 0;
 
         for (LocalNotificationRequest notification : notifications) {
             try {
-                Date due = notification.getTriggerHandler().getTriggerDate();
-                if (due != null && !due.after(now) && notification.getTriggerHandler().isLastOccurrence()) {
-                    String channelId = notification.getOptions().getAndroidChannelId();
-                    boolean enabled = appEnabled;
-                    if (enabled) {
-                        Boolean cached = channelEnabled.get(channelId);
-                        if (cached == null) {
-                            JSONObject channel = channels.get(channelId);
-                            // Missing channels can be recreated; Android 7 has no channels.
-                            cached = channel == null || channel.getBoolean("enabled");
-                            channelEnabled.put(channelId, cached);
-                        }
-                        enabled = cached;
-                    }
-                    if (!enabled) {
-                        editor.remove(notification.getSharedPreferencesKeyOptions())
-                            .remove(notification.getSharedPreferencesKeyOccurrence())
-                            .remove(notification.getSharedPreferencesKeyTriggerBaseDate())
-                            .remove(notification.getSharedPreferencesKeyTriggerDate());
-                        removed++;
-                        continue;
-                    }
+                if (isExpiredFinalOccurrence(notification, now)
+                        && isBlockedBySettings(notification, appEnabled, channels, channelEnabled)) {
+                    removeStoredNotification(editor, notification);
+                    continue;
                 }
             } catch (Exception e) {
                 // If settings cannot be read, preserve the request rather than deleting it.
@@ -132,11 +123,45 @@ public class RestoreReceiver extends BroadcastReceiver {
             remaining.add(notification);
         }
 
-        // Shrink the map before schedule() writes any remaining requests back to it.
-        if (removed > 0) editor.apply();
-        Log.d(TAG, "Removed expired blocked notifications, count: " + removed);
+        if (remaining.size() < notifications.size()) editor.apply();
+        Log.d(TAG, "Removed expired blocked notifications, count: "
+            + (notifications.size() - remaining.size()));
+        return remaining;
+    }
 
-        for (LocalNotificationRequest notification : remaining) {
+    /** Future requests and requests with further occurrences must remain stored. */
+    private boolean isExpiredFinalOccurrence(LocalNotificationRequest notification, Date now) {
+        Date due = notification.getTriggerHandler().getTriggerDate();
+        return due != null && !due.after(now) && notification.getTriggerHandler().isLastOccurrence();
+    }
+
+    /** Read app/channel/group blocking, querying each channel at most once per restore. */
+    private boolean isBlockedBySettings(LocalNotificationRequest notification, boolean appEnabled,
+            LocalNotificationChannels channels, Map<String, Boolean> channelEnabled) throws JSONException {
+        if (!appEnabled) return true;
+
+        String channelId = notification.getOptions().getAndroidChannelId();
+        Boolean enabled = channelEnabled.get(channelId);
+        if (enabled == null) {
+            JSONObject channel = channels.get(channelId);
+            // Missing channels can be recreated; Android 7 has no channels.
+            enabled = channel == null || channel.getBoolean("enabled");
+            channelEnabled.put(channelId, enabled);
+        }
+        return !enabled;
+    }
+
+    /** Queue all four lifecycle keys for removal; the caller applies the editor once. */
+    private void removeStoredNotification(SharedPreferences.Editor editor, LocalNotificationRequest notification) {
+        editor.remove(notification.getSharedPreferencesKeyOptions())
+            .remove(notification.getSharedPreferencesKeyOccurrence())
+            .remove(notification.getSharedPreferencesKeyTriggerBaseDate())
+            .remove(notification.getSharedPreferencesKeyTriggerDate());
+    }
+
+    /** A failure restoring one request must not prevent restoration of the following ones. */
+    private void restoreNotifications(List<LocalNotificationRequest> notifications) {
+        for (LocalNotificationRequest notification : notifications) {
             try {
                 notification.schedule();
             } catch (Exception e) {

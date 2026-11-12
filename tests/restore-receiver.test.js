@@ -35,6 +35,7 @@ import android.content.Context;
 public class NotificationManagerCompat {public static boolean enabled=true;
  public static NotificationManagerCompat from(Context c){return new NotificationManagerCompat();}
  public boolean areNotificationsEnabled(){return enabled;}}`,
+    'org/json/JSONException.java': `package org.json; public class JSONException extends Exception {}`,
     'org/json/JSONObject.java': `package org.json;
 public class JSONObject {private final boolean enabled; public JSONObject(boolean e){enabled=e;}
  public boolean getBoolean(String key){return enabled;}}`,
@@ -42,7 +43,7 @@ public class JSONObject {private final boolean enabled; public JSONObject(boolea
 import android.content.Context; import org.json.JSONObject; import java.util.*;
 public class LocalNotificationChannels {
  public static final Map<String,Integer> reads=new HashMap<>();
- public LocalNotificationChannels(Context c){} public JSONObject get(String id){
+ public LocalNotificationChannels(Context c){} public JSONObject get(String id) throws org.json.JSONException {
  reads.put(id,reads.getOrDefault(id,0)+1);
  if(id.equals("unreadable"))throw new IllegalStateException("Settings unavailable");
  return id.equals("missing")?null:new JSONObject(!id.startsWith("blocked"));}}
