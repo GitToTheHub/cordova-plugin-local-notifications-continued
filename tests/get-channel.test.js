@@ -71,3 +71,60 @@ test('allows an omitted callback on Android and iOS', () => {
         assert.doesNotThrow(() => plugin.getChannel('reminders'));
     }
 });
+
+
+test('creates, reads, and deletes channel groups with the expected bridge arguments', () => {
+    const { plugin, calls } = loadPlugin('Android', true);
+    const options = { id: 'accounts', name: 'Accounts', description: 'Account reminders' };
+    const scope = {};
+    let received;
+    plugin.createChannelGroup(options, function (result) {
+        assert.equal(this, scope);
+        received = result;
+    }, scope);
+    assert.equal(received, true);
+    assert.equal(calls[0].action, 'createChannelGroup');
+    assert.deepEqual(JSON.parse(JSON.stringify(calls[0].args)), [options]);
+    plugin.getChannelGroup('accounts', () => {});
+    plugin.deleteChannelGroup('accounts', () => {});
+    assert.deepEqual(calls.slice(1), [
+        { service: 'LocalNotification', action: 'getChannelGroup', args: ['accounts'] },
+        { service: 'LocalNotification', action: 'deleteChannelGroup', args: ['accounts'] }
+    ]);
+});
+
+test('group operations return unsupported results on iOS without calling native code', () => {
+    const { plugin, calls } = loadPlugin('iOS');
+    const scope = {};
+    const results = [];
+    function callback(value) { assert.equal(this, scope); results.push(value); }
+    plugin.createChannelGroup({ id: 'group', name: 'Group' }, callback, scope);
+    plugin.getChannelGroup('group', callback, scope);
+    plugin.deleteChannelGroup('group', callback, scope);
+    assert.deepEqual(results, [false, null, false]);
+    assert.doesNotThrow(() => plugin.createChannelGroup({ id: 'group', name: 'Group' }));
+    assert.doesNotThrow(() => plugin.getChannelGroup('group'));
+    assert.doesNotThrow(() => plugin.deleteChannelGroup('group'));
+    assert.deepEqual(calls, []);
+});
+
+test('validates group IDs, names, and descriptions before invoking native code', () => {
+    const { plugin, calls } = loadPlugin('Android');
+    for (const options of [null, {}, { id: '', name: 'Group' }, { id: 'g', name: '' },
+        { id: 1, name: 'Group' }, { id: 'g', name: 'Group', description: 1 }]) {
+        assert.throws(() => plugin.createChannelGroup(options), { name: 'TypeError' });
+    }
+    for (const id of [undefined, null, '', 1]) {
+        assert.throws(() => plugin.getChannelGroup(id), { name: 'TypeError' });
+        assert.throws(() => plugin.deleteChannelGroup(id), { name: 'TypeError' });
+    }
+    assert.deepEqual(calls, []);
+});
+
+test('forwards group membership when preparing channel options', () => {
+    const { plugin, calls } = loadPlugin('Android');
+    plugin._defaults = Object.assign({}, plugin._commonOptions, plugin._androidSpecificOptions);
+    plugin.createChannel({ androidChannelId: 'reminders', androidChannelGroupId: 'accounts' });
+    assert.equal(calls[0].action, 'createChannel');
+    assert.equal(calls[0].args[0].androidChannelGroupId, 'accounts');
+});

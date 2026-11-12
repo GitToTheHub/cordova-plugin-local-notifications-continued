@@ -636,6 +636,46 @@ cordova.plugins.notification.local.schedule([
 
 ## Android channels
 
+### Channel Groups
+
+Channel groups organize channels in Android's notification settings, for example by account or household. They are different from [notification grouping](#grouping), which bundles posted notifications in the notification drawer. The plugin does not create a default group; channels remain ungrouped unless you assign one.
+
+Create a group first, then pass its ID as `androidChannelGroupId` when creating a channel or scheduling a notification. Wait for the group callback so the group exists before the channel is created:
+
+```js
+if (cordova.platformId === 'android') {
+    const notifications = cordova.plugins.notification.local;
+
+    notifications.createChannelGroup({
+        id: 'household',
+        name: 'Household',
+        description: 'Reminders for this household'
+    }, (supported) => {
+        if (!supported) return; // Channel groups require Android 8 or newer.
+
+        notifications.schedule({
+            id: 50,
+            title: 'Collection reminder',
+            text: 'Put out the recycling bin tonight.',
+            androidChannelId: 'recycling',
+            androidChannelName: 'Recycling',
+            androidChannelGroupId: 'household',
+            trigger: { in: 30, unit: 'minute' }
+        });
+    });
+}
+```
+
+The group must already exist when using `androidChannelGroupId`. On Android 7 this property is ignored because channels and channel groups are unsupported. On iOS, omit Android-specific options.
+
+An existing ungrouped channel can be assigned to a group without resetting its sound or importance. Once a channel belongs to a group, Android does not allow moving it to another group; reusing its ID with another `androidChannelGroupId` leaves the original group unchanged.
+
+Groups are available from Android 8 (API 26). Android 9 (API 28) adds group descriptions and the ability to block an entire group. On Android 8, group queries return `description: null` and `blocked: false`. On Android 9 and newer, [getChannel](#getchannel) includes the actual group blocking status in `groupBlocked`.
+
+Use [getChannelGroup](#getchannelgroup) to inspect a group, or [deleteChannelGroup](#deletechannelgroup) to delete it. Deleting a group also deletes every channel in it, affecting notifications that use those channels. Do not use deletion as a way to bypass the user's notification settings. Pending notification schedules are not canceled by this method; cancel or update them separately if needed.
+
+See [Android: Create and Manage Notification Channels](https://developer.android.com/develop/ui/views/notifications/channels) for the platform behavior.
+
 ### Default channel
 The following settings will be used for the default Android channel.
 
@@ -842,6 +882,9 @@ Note: This list has still to be documented.
 | clear                          | x       | x   | On Android, it clears a already posted notification from the statusbar. |
 | clearAll                       | x       | x   |                           |
 | [createChannel](#createchannel) | x       | -   | Creates a channel for Android to post notifications on. |
+| [createChannelGroup](#createchannelgroup) | x | - | Create or update an Android notification channel group. |
+| [getChannelGroup](#getchannelgroup) | x | - | Read a channel group and its channel IDs. |
+| [deleteChannelGroup](#deletechannelgroup) | x | - | Delete a group and all of its channels. |
 | [getChannel](#getchannel) | x | - | Read current Android channel settings without creating or changing the channel. |
 | [deleteChannel](#deletechannel) | x       | -   | Delete a channel by an id. |
 | fireQueuedEvents               | x       | x   | Fire queued events once the device is ready and all listeners are registered. This is done automatically, when `deviceready` is fired. Calls the Plugin with a `ready` action. |
@@ -910,6 +953,55 @@ Property documentation:
 - [androidChannelEnableVibration](#property-androidchannelenablevibration)
 - [sound](#property-sound)
 - [androidChannelSoundUsage](#property-androidchannelsoundusage)
+
+### createChannelGroup
+
+Android 8 and newer. Creates a notification channel group or updates its name and description. Existing channels and the user's blocked setting are preserved.
+
+Signature: `createChannelGroup({ id, name, description }, callback, scope)`.
+
+- `id` and `name` must be non-empty strings.
+- `description` is a string or `null`; it is supported on Android 9 and newer. Omitting it clears the description when updating a group.
+- The callback receives `true` on Android 8 and newer, or `false` on Android 7 and iOS.
+
+See [Channel Groups](#channel-groups) for a complete example. The optional `scope` sets the callback's `this` context.
+
+### getChannelGroup
+
+Android 8 and newer. Reads a group's current settings without creating or changing it.
+
+```js
+cordova.plugins.notification.local.getChannelGroup('household', (group) => {
+    if (group === null) return;
+    console.log('Group:', group.name);
+    console.log('Blocked:', group.blocked);
+    console.log('Channel IDs:', group.channelIds);
+});
+```
+
+Signature: `getChannelGroup(groupId, callback, scope)`. `groupId` must be a non-empty string. The callback receives `null` for a missing or deleted group, on Android 7, or on iOS. Otherwise it receives:
+
+| Field | Type | Meaning |
+| :---- | :--- | :------ |
+| `id` | string | Group ID. |
+| `name` | string | Current user-visible name. |
+| `description` | string or null | Group description; `null` on Android 8. |
+| `blocked` | boolean | Whether the user has blocked the group. Supported on Android 9 and newer; otherwise `false`. |
+| `channelIds` | string[] | IDs of the group's current, non-deleted channels. |
+
+The optional `scope` sets the callback's `this` context. Group blocking is separate from app permission and individual channel blocking; [getChannel](#getchannel) reports these settings separately.
+
+### deleteChannelGroup
+
+Android 8 and newer. **Deletes the group and all channels belonging to it.** This can remove their posted notifications. Pending notification schedules are not canceled; cancel or update them separately when removing a group your reminders use.
+
+```js
+cordova.plugins.notification.local.deleteChannelGroup('household', (supported) => {
+    if (supported) console.log('Group and its channels deleted.');
+});
+```
+
+Signature: `deleteChannelGroup(groupId, callback, scope)`. `groupId` must be a non-empty string. Deleting an unknown group has no effect. The callback receives `true` on Android 8 and newer, or `false` on Android 7 and iOS. The optional `scope` sets the callback's `this` context.
 
 ### getChannel
 
@@ -1183,6 +1275,7 @@ These properties are only available on Android.
 | [androidAlarmType](#property-androidalarmtype) | `RTC_WAKEUP` |              |
 | [androidAllowWhileIdle](#property-androidallowwhileidle) | `false` | Alarm will be allowed to execute even when the system is in low-power idle (a.k.a. doze) modes. |
 | androidAutoCancel      | `true`            | Make this notification automatically dismissed when the user touches it |
+| [androidChannelGroupId](#channel-groups) | `null` | Assign the channel to an existing channel group. Android 8 and newer. Create the group first with `createChannelGroup()`. This is separate from `androidGroup`, which groups posted notifications. |
 | androidChannelDescription | `null`            | Sets the `description` of a [notification channel](#notification-channels). |
 | [androidChannelEnableLights](#property-androidchannelenablelights) | `false` | Can be `true` or `false`and sets whether notifications posted to a [notification channel](#android-channels) should display notification lights, on devices that support that feature. |
 | [androidChannelEnableVibration](#property-androidchannelenablevibration) | `false`            | Enables the vibration of a channel. |
