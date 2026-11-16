@@ -54,3 +54,17 @@ The Promise API also passed native end-to-end checks in the disposable Abfuhrkal
 It verifies off-main-thread preference loading and scheduling, one broadcast completion, bulk cleanup before surviving requests are stored, and one channel-settings lookup per channel. Its 1,001-entry backlog case retains future, repeating, overdue displayable, missing-channel, missing-date, and unreadable-settings requests. App-level blocking, channel/group blocking, per-request failures, all three restoration broadcasts, and unrelated/null intents are covered.
 
 Native validation on Android 16 used a disposable app copy with 1,005 persisted requests: 1,001 expired one-time requests on a blocked channel plus future, repeating, overdue enabled, and missing-channel cases. Reinstalling the APK and rebooting the emulator each removed exactly 1,001 requests and retained the four control requests. With app-level notifications disabled, exactly 1,003 expired requests were removed and both future/repeating requests remained. Receiver logs confirmed that preference loading and restoration ran on a worker thread. No ANR or native exception occurred in these runs.
+
+## Version Consistency
+
+`npm test` checks that the versions in `plugin.xml`, JavaScript metadata, the Android `PLUGIN_VERSION` constant, and `package-lock.json` match `package.json`. It also tests synchronization for release and development versions. `npm pack` and `npm publish` run the version check through `prepack` and fail if a version is stale.
+
+Use the npm version lifecycle to prepare a version change without creating a commit or tag:
+
+```sh
+npm version 1.2.6 --no-git-tag-version
+# Or prepare the next development version:
+npm version 1.2.7-dev --no-git-tag-version
+```
+
+The `version` script synchronizes the other files from `package.json`. Review and commit all changed files together before creating a release tag. The changelog and release notes are maintained separately. If `package.json` was edited manually, run `node scripts/sync-version.js`. Never change the fixed migration thresholds in `Options.java` just to bump the plugin version.

@@ -1,5 +1,9 @@
 # ChangeLog
 
+## 1.2.6
+
+- fix(android): synchronize restored notification metadata with the plugin version from `package.json`; automate version updates and check consistency before packaging.
+
 ## 1.2.5
 
 **Features:**

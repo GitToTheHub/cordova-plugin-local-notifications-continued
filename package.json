@@ -1,8 +1,11 @@
 {
   "name": "cordova-plugin-local-notifications-continued",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "scripts": {
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "version": "node scripts/sync-version.js",
+    "check:version": "node scripts/sync-version.js --check",
+    "prepack": "npm run check:version"
   },
   "description": "Schedules and queries for local notifications",
   "cordova": {
@@ -42,11 +45,13 @@
     }
   },
   "author": "Sebastián Katzer",
-  "contributors": [{
-    "name": "Manuel Beck",
-    "email": "email@manuelbeck.software",
-    "url": "https://manuelbeck.software"
-  }],
+  "contributors": [
+    {
+      "name": "Manuel Beck",
+      "email": "email@manuelbeck.software",
+      "url": "https://manuelbeck.software"
+    }
+  ],
   "funding": "https://github.com/sponsors/GitToTheHub",
   "license": "Apache 2.0",
   "bugs": {

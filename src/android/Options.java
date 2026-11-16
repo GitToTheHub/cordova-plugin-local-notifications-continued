@@ -58,6 +58,9 @@ public final class Options {
 
     private static final String TAG = "Options";
 
+    // Synchronized from package.json by scripts/sync-version.js.
+    private static final String PLUGIN_VERSION = "1.2.6";
+
     public static final String LARGE_ICON_TYPE_SQUARE = "square";
     public static final String LARGE_ICON_TYPE_CIRCLE = "circle";
 
@@ -93,8 +96,8 @@ public final class Options {
             if (isVersionOlder(metaVersion, "1.1.8")) convertPropertiesForVersion118(options);
 
             // Update meta.version to current plugin version
-            if (!metaVersion.equals("1.2.4")) {
-                meta.put("version", "1.2.4");
+            if (!metaVersion.equals(PLUGIN_VERSION)) {
+                meta.put("version", PLUGIN_VERSION);
                 options.put("meta", meta);
             }
         } catch (JSONException exception) {
