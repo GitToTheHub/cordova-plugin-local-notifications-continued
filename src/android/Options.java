@@ -59,7 +59,7 @@ public final class Options {
     private static final String TAG = "Options";
 
     // Synchronized from package.json by scripts/sync-version.js.
-    private static final String PLUGIN_VERSION = "1.2.6";
+    private static final String PLUGIN_VERSION = "1.2.7-dev";
 
     public static final String LARGE_ICON_TYPE_SQUARE = "square";
     public static final String LARGE_ICON_TYPE_CIRCLE = "circle";
