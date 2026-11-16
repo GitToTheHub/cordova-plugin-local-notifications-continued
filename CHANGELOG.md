@@ -1,6 +1,6 @@
 # ChangeLog
 
-## 1.2.5-dev
+## 1.2.5
 
 **Features:**
 

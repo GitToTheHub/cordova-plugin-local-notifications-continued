@@ -36,7 +36,7 @@ Notifications can display text, play a sound, update a badge, and offer action b
 
 Starting with **version 1.2.5**, asynchronous methods support Promises. The examples use `async` / `await`; native failures reject the Promise and can be handled with `try` / `catch`. Existing callback-based calls remain supported for backward compatibility, but this API style is planned for removal in a future version. No removal version has been set; use Promises for new code. This does not apply to event listeners such as `on()` and `un()`.
 
-The global `LocalNotifications` alias, channel queries ([`getChannel()`](#getchannel)), `channel.enabled`, and channel-group APIs are also available from version 1.2.5. These features are currently available in **1.2.5-dev on GitHub** and are not included in the 1.2.4 npm release.
+The global `LocalNotifications` alias, channel queries ([`getChannel()`](#getchannel)), `channel.enabled`, and channel-group APIs are also available from version 1.2.5.
 
 ### Supported Platforms
 
@@ -2734,7 +2734,7 @@ A shared file in `[Installed-App-Path]/files/shared_files`. This is necessary to
 
 ## Upgrade Notice
 
-### Version 1.2.5 (Upcoming)
+### Version 1.2.5
 
 - Asynchronous methods support Promises. Use `await` with `try` / `catch`, or `.then()` / `.catch()`, to handle completion and failures.
 - Existing callback-based calls remain supported, including the optional error callbacks added in 1.2.5. Callback-based operation methods are planned for removal in a future version; no removal version has been set. Migrate to Promises. Event listeners such as `on()` and `un()` are unaffected.
