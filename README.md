@@ -17,7 +17,7 @@ Notifications can display text, play a sound, update a badge, and offer action b
 
 | Android 16 - Notification Drawer | iOS 26.5 - Notification Center |
 | :--------- | :------- |
-| <img width="320" src="images/android-notification-example-android16-full.png" alt="Notification drawer showing an appointment reminder on Android 16, with the full Pixel 10 Pro emulator frame"> | <img width="320" src="images/ios-notification-example-ios26-full.png" alt="Notification Center showing an appointment reminder on iOS 26.5, with the full iPhone 17 Pro simulator frame"> |
+| <img height="640" src="images/android-notification-example-android16-full.png" alt="Notification drawer showing an appointment reminder on Android 16, with the full Pixel 10 Pro emulator frame"> | <img height="640" src="images/ios-notification-example-ios26-full.png" alt="Notification Center showing an appointment reminder on iOS 26.5, with the full iPhone 17 Pro simulator frame"> |
 
 *Notifications created with this plugin in the Pixel 10 Pro emulator (Android 16) and iPhone 17 Pro simulator (iOS 26.5), with their complete original device frames. The screenshots show the notification drawer on Android and Notification Center on iOS. Android uses the plugin's default channel importance ([`IMPORTANCE_DEFAULT`](#property-androidchannelimportance)), without requesting a heads-up banner. Appearance varies by platform, device, and notification settings.*
 
@@ -34,7 +34,9 @@ Notifications can display text, play a sound, update a badge, and offer action b
 - [Property reference](#properties-1): [common](#common-properties), [Android](#android-properties), and [iOS](#ios-properties)
 - [Upgrade notes](#upgrade-notice) and [renamed properties](#changed-properties)
 
-The global `LocalNotifications` alias, Promise API, channel query ([`getChannel()`](#getchannel)), `channel.enabled`, and channel-group APIs described below are available in **1.2.5-dev on GitHub**. They are not included in the 1.2.4 npm release.
+Starting with **version 1.2.5**, asynchronous methods support Promises. The examples use `async` / `await`; native failures reject the Promise and can be handled with `try` / `catch`. Existing callback-based calls remain supported for backward compatibility, but this API style is planned for removal in a future version. No removal version has been set; use Promises for new code. This does not apply to event listeners such as `on()` and `un()`.
+
+The global `LocalNotifications` alias, channel queries ([`getChannel()`](#getchannel)), `channel.enabled`, and channel-group APIs are also available from version 1.2.5. These features are currently available in **1.2.5-dev on GitHub** and are not included in the 1.2.4 npm release.
 
 ### Supported Platforms
 
@@ -1245,7 +1247,7 @@ LocalNotifications.fireQueuedEvents();
 
 Most methods that communicate with the native platform are asynchronous. Use `await` to receive their results or wait for an operation to complete. The examples run after `deviceready`; each self-contained example catches rejected Promises.
 
-[`getDefaults()`](#getdefaults) returns a value synchronously. [`setDefaults()`](#setdefaults), [`on()`](#methods), and [`un()`](#methods) also operate in JavaScript without a native completion callback.
+[`getDefaults()`](#getdefaults) returns a value synchronously. [`setDefaults()`](#setdefaults), [`on()`](#methods), and [`un()`](#methods) are synchronous JavaScript operations.
 
 ```js
 async function methodsExample() {
@@ -1263,7 +1265,7 @@ async function methodsExample() {
 methodsExample();
 ```
 
-Asynchronous methods return a Promise when called without callbacks. Use `await` inside an `async` function and handle failures with `try` / `catch`:
+Asynchronous methods return a Promise. Use `await` inside an `async` function and handle failures with `try` / `catch`:
 
 ```js
 async function methodsExample2() {
@@ -1288,7 +1290,7 @@ methodsExample2();
 
 The Promise resolves with the operation result. Native failures and JavaScript validation errors reject it. Permission denial (`false`) and missing channels (`null`) are normal fulfilled results. `get()` without arguments returns all notifications. For scheduling options, use `schedule(options, { skipPermission: true })` or `update(options, { skipPermission: true })`.
 
-Synchronous methods such as [`getDefaults()`](#getdefaults) and [`setDefaults()`](#setdefaults), and event registration through `on()` / `un()`, keep their existing behavior. Supplying a callback keeps the callback API and its return value; object scopes remain supported. A custom Promise wrapper that only passes a success callback still needs its own rejection handler, or can be replaced by the plugin's Promise API.
+Synchronous methods such as [`getDefaults()`](#getdefaults) and [`setDefaults()`](#setdefaults), and event registration through `on()` / `un()`, keep their existing behavior.
 
 Native scheduling failures reject the Promise. A batch stops at its first failed request; earlier successful operations are not rolled back. On Android, failures can include invalid channel/group or alarm settings, denied alarm or sound access, or system limits (commonly 500 alarms per app, depending on the device). A blocked channel is a normal system setting and is not itself a scheduling exception. On iOS, scheduling and updating wait for the native completion handlers, and authorization errors also reject the Promise.
 
@@ -1296,59 +1298,519 @@ In the table, **pending** means scheduled for future delivery; **delivered** mea
 
 | Method | Android | iOS | Description |
 | :----- | :------ | :-- | :---------- |
-| addActions | x | x | Register a reusable action group. See [Actions](#actions). |
-| cancel | x | x | Remove notifications and cancel their pending delivery. Accepts an ID or array of IDs. |
-| cancelAll | x | x | Remove all notifications and cancel all pending delivery. |
+| [addActions](#addactions) | x | x | Register a reusable action group. See [Actions](#actions). |
+| [cancel](#cancel) | x | x | Remove notifications and cancel their pending delivery. Accepts an ID or array of IDs. |
+| [cancelAll](#cancelall) | x | x | Remove all notifications and cancel all pending delivery. |
 | [canScheduleExactAlarms](#canscheduleexactalarms) | x | — | Check whether exact alarms are permitted. |
-| clear | x | x | Dismiss delivered notifications without canceling pending delivery. Accepts an ID or array of IDs. |
-| clearAll | x | x | Dismiss all delivered notifications without canceling pending delivery. |
+| [clear](#clear) | x | x | Dismiss delivered notifications without canceling pending delivery. Accepts an ID or array of IDs. |
+| [clearAll](#clearall) | x | x | Dismiss all delivered notifications without canceling pending delivery. |
 | [createChannel](#createchannel) | x | — | Create an Android notification channel. |
 | [createChannelGroup](#createchannelgroup) | x | — | Create or update an Android notification channel group. |
 | [getChannelGroup](#getchannelgroup) | x | — | Read a channel group and its channel IDs. |
 | [deleteChannelGroup](#deletechannelgroup) | x | — | Delete a group and all of its channels. |
 | [getChannel](#getchannel) | x | — | Read current Android channel settings without creating or changing the channel. |
 | [deleteChannel](#deletechannel) | x | — | Delete an Android channel by ID. |
-| fireQueuedEvents | x | x | Deliver queued events after listeners are registered. Normally called automatically; see [Launch Details](#launch-details). |
-| get | x | x | Retrieve one notification by ID, or an array of notifications by an array of IDs. |
-| getAll | x | x | Retrieve all pending and delivered notifications. |
+| [fireEvent](#fireevent) | x | x | Invoke JavaScript event listeners synchronously; does not post a notification. |
+| [getKey](#getkey) | x | x | Find the first matching key in a JavaScript object; utility method. |
+| [fireQueuedEvents](#firequeuedevents) | x | x | Deliver queued events after listeners are registered. Normally called automatically; see [Launch Details](#launch-details). |
+| [get](#get) | x | x | Retrieve one notification by ID, or an array of notifications by an array of IDs. |
+| [getAll](#getall) | x | x | Retrieve all pending and delivered notifications. |
 | [getDefaults](#getdefaults) | x | x | Return current property defaults synchronously. |
-| getIds | x | x | Retrieve the IDs of all pending and delivered notifications. |
-| getScheduled | x | x | Retrieve pending notifications. |
-| getScheduledIds | x | x | Retrieve the IDs of pending notifications. |
-| getTriggered | x | x | Retrieve delivered notifications. |
-| getTriggeredIds | x | x | Retrieve the IDs of delivered notifications. |
-| getType | x | x | Retrieve the state of an ID: `scheduled`, `triggered`, or `unknown`. |
+| [getIds](#getids) | x | x | Retrieve the IDs of all pending and delivered notifications. |
+| [getScheduled](#getscheduled) | x | x | Retrieve pending notifications. |
+| [getScheduledIds](#getscheduledids) | x | x | Retrieve the IDs of pending notifications. |
+| [getTriggered](#gettriggered) | x | x | Retrieve delivered notifications. |
+| [getTriggeredIds](#gettriggeredids) | x | x | Retrieve the IDs of delivered notifications. |
+| [getType](#gettype) | x | x | Retrieve the state of an ID: `scheduled`, `triggered`, or `unknown`. |
 | [getUnusedAppRestrictionsStatus](#getunusedapprestrictionsstatus) | x | — | Retrieve the Android unused-app restrictions status. |
-| hasActions | x | x | Check whether an action group is registered. |
+| [hasActions](#hasactions) | x | x | Check whether an action group is registered. |
 | [hasPermission](#haspermission) | x | x | Check notification permission without requesting it. |
 | [iOSClearBadge](#iosclearbadge) | — | x | Clear the app icon badge. |
-| isPresent | x | x | Check whether an ID belongs to a pending or delivered notification. |
-| isScheduled | x | x | Check whether an ID belongs to a pending notification. |
-| isTriggered | x | x | Check whether an ID belongs to a delivered notification. |
-| on | x | x | Register a listener for an [event](#events). |
+| [isPresent](#ispresent) | x | x | Check whether an ID belongs to a pending or delivered notification. |
+| [isScheduled](#isscheduled) | x | x | Check whether an ID belongs to a pending notification. |
+| [isTriggered](#istriggered) | x | x | Check whether an ID belongs to a delivered notification. |
+| [on](#on) | x | x | Register a listener for an [event](#events). |
 | [openAlarmSettings](#openalarmsettings) | x | — | Open the exact alarm settings on Android 12 and newer. |
 | [openManageUnusedAppRestrictions](#openmanageunusedapprestrictions) | x | — | Open the unused-app restriction settings. |
 | [openNotificationSettings](#opennotificationsettings) | x | x | Open notification settings on Android 8 and newer, or app settings on iOS. |
-| removeActions | x | x | Remove a registered action group by ID. |
+| [removeActions](#removeactions) | x | x | Remove a registered action group by ID. |
 | [requestPermission](#requestpermission) | x | x | Request notification permission and return the current grant status. |
-| schedule | x | x | Schedule one notification object or an array of notification objects. |
+| [schedule](#schedule) | x | x | Schedule one notification object or an array of notification objects. |
 | [setDefaults](#setdefaults) | x | x | Change property defaults synchronously for subsequent calls. |
-| un | x | x | Unregister an [event](#events) listener. |
-| update | x | x | Update existing notifications by ID. Accepts an object or array of objects. |
+| [un](#un) | x | x | Unregister an [event](#events) listener. |
+| [update](#update) | x | x | Update existing notifications by ID. Accepts an object or array of objects. |
 
-### Callback Compatibility
+### update
 
-Existing callback-based calls remain supported. Pass a success callback followed by an optional error callback; these calls do not return a Promise. A legacy object such as `this` in the error-callback position still sets the success callback's context. Event listeners registered with `on()` retain their existing callback API.
+`update(options, args)`.
 
-Native errors go to the error callback. Without an error callback, callback-based calls log failures to the JavaScript console. A custom Promise wrapper that only resolves from the success callback remains pending on failure; replace it with the plugin's Promise API or pass its rejection handler explicitly.
+Update existing notifications by numeric ID. Accepts one object or an array; each object must contain `id`. Unknown IDs are ignored. Unspecified properties remain unchanged. The optional `args` supports `skipPermission` as described under [schedule](#schedule).
 
-For `schedule()` and `update()`, the callback argument order is `options, successCallback, errorCallback, args`.
+On Android, this merges stored options and refreshes a currently displayed notification; changing `trigger` does not recalculate an already scheduled alarm. To change delivery time consistently across platforms, call [schedule](#schedule) with the same ID and the complete new options instead.
+
+Resolves to the current app-level notification permission status. Permission denial is `false`; native failures reject the Promise. On iOS, completion waits for native update requests.
+
+```js
+async function updateExample() {
+    try {
+        await LocalNotifications.update({ id: 1, title: 'Updated reminder', text: 'The appointment time has changed.' });
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+updateExample();
+```
+
+### clear
+
+`clear(ids)`.
+
+Dismiss currently displayed notifications by numeric ID or an array of IDs. Future occurrences of recurring notifications remain scheduled. Unknown IDs are ignored.
+
+Use this method for displayed notifications. On Android, clearing a final occurrence removes its saved data even if its ID is only pending; this can prevent later delivery without explicitly canceling the alarm. Use [cancel](#cancel) to manage pending notifications.
+
+Resolves without a result value after the native operation completes. Native failures reject the Promise.
+
+```js
+async function clearExample() {
+    try {
+        const displayedIds = await LocalNotifications.getTriggeredIds();
+        await LocalNotifications.clear(displayedIds);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+clearExample();
+```
+
+### clearAll
+
+`clearAll()`.
+
+Dismiss all displayed notifications without canceling their future alarms or repetitions. Use [cancelAll](#cancelall) to remove both pending and displayed notifications.
+
+Resolves without a result value after the native operation completes. Native failures reject the Promise.
+
+```js
+async function clearAllExample() {
+    try {
+        await LocalNotifications.clearAll();
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+clearAllExample();
+```
+
+### cancel
+
+`cancel(ids)`.
+
+Cancel pending delivery and dismiss displayed notifications for a numeric ID or an array of IDs. Stored notification data is removed. Unknown IDs are ignored.
+
+Resolves without a result value after the native operation completes. Native failures reject the Promise.
+
+```js
+async function cancelExample() {
+    try {
+        await LocalNotifications.cancel([1, 2]);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+cancelExample();
+```
+
+### cancelAll
+
+`cancelAll()`.
+
+Cancel all pending notifications and dismiss all displayed notifications managed by the plugin. On iOS this also clears the app icon badge.
+
+Resolves without a result value after the native operation completes. Native failures reject the Promise.
+
+```js
+async function cancelAllExample() {
+    try {
+        await LocalNotifications.cancelAll();
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+cancelAllExample();
+```
+
+### get
+
+`get(id), get(ids), or get()`.
+
+Read notification options. A numeric ID returns a single options object; an array returns the matching options objects, omitting missing IDs. Without arguments, the Promise returns all notifications. An explicit empty array returns an empty selection.
+
+A missing single ID returns no options object (Android: no result value; iOS: `null`). Check the result before reading its properties. Native failures reject the Promise.
+
+```js
+async function getExample() {
+    try {
+        const notification = await LocalNotifications.get(1);
+        if (notification != null) console.log(notification.title);
+        const selected = await LocalNotifications.get([1, 2]);
+        const all = await LocalNotifications.get();
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+getExample();
+```
+
+### getAll
+
+`getAll()`.
+
+Read all pending and displayed notifications as an array of saved options objects. Returns an empty array when none match. These are plugin notification records, not arbitrary notifications posted by other apps.
+
+Native failures reject the Promise.
+
+```js
+async function getAllExample() {
+    try {
+        const notifications = await LocalNotifications.getAll();
+        console.log(notifications);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+getAllExample();
+```
+
+### getScheduled
+
+`getScheduled()`.
+
+Read pending notifications as an array of saved options objects. Returns an empty array when none match. These are plugin notification records, not arbitrary notifications posted by other apps. On Android, a stored record that is not currently displayed is classified as scheduled; this is not proof that an alarm is still pending or will be delivered.
+
+Native failures reject the Promise.
+
+```js
+async function getScheduledExample() {
+    try {
+        const notifications = await LocalNotifications.getScheduled();
+        console.log(notifications);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+getScheduledExample();
+```
+
+### getTriggered
+
+`getTriggered()`.
+
+Read currently displayed notifications as an array of saved options objects. Returns an empty array when none match. These are plugin notification records, not arbitrary notifications posted by other apps.
+
+Native failures reject the Promise.
+
+```js
+async function getTriggeredExample() {
+    try {
+        const notifications = await LocalNotifications.getTriggered();
+        console.log(notifications);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+getTriggeredExample();
+```
+
+### getIds
+
+`getIds()`.
+
+Read the numeric IDs of all pending and displayed notifications. Resolves to an array of numbers, or `[]` when none match. See [getScheduled](#getscheduled) for Android state-classification details.
+
+```js
+async function getIdsExample() {
+    try {
+        const ids = await LocalNotifications.getIds();
+        console.log(ids);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+getIdsExample();
+```
+
+### getScheduledIds
+
+`getScheduledIds()`.
+
+Read the numeric IDs of pending notifications. Resolves to an array of numbers, or `[]` when none match. See [getScheduled](#getscheduled) for Android state-classification details.
+
+```js
+async function getScheduledIdsExample() {
+    try {
+        const ids = await LocalNotifications.getScheduledIds();
+        console.log(ids);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+getScheduledIdsExample();
+```
+
+### getTriggeredIds
+
+`getTriggeredIds()`.
+
+Read the numeric IDs of currently displayed notifications. Resolves to an array of numbers, or `[]` when none match. See [getScheduled](#getscheduled) for Android state-classification details.
+
+```js
+async function getTriggeredIdsExample() {
+    try {
+        const ids = await LocalNotifications.getTriggeredIds();
+        console.log(ids);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+getTriggeredIdsExample();
+```
+
+### getType
+
+`getType(id)`.
+
+Read the plugin state of a numeric notification ID. Resolves to `scheduled`, `triggered` (currently displayed), or `unknown` (not found). A missing ID is a normal result, not an error. See [getScheduled](#getscheduled) for Android state-classification details.
+
+```js
+async function getTypeExample() {
+    try {
+        const type = await LocalNotifications.getType(1);
+        console.log(type);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+getTypeExample();
+```
+
+### isPresent
+
+`isPresent(id)`.
+
+Check whether a numeric notification ID is known as pending or displayed. Resolves to a boolean; missing IDs return `false`. This checks notification state, not app permission or channel settings.
+
+```js
+async function isPresentExample() {
+    try {
+        const result = await LocalNotifications.isPresent(1);
+        console.log(result);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+isPresentExample();
+```
+
+### isScheduled
+
+`isScheduled(id)`.
+
+Check whether a numeric notification ID is classified as pending. Resolves to a boolean; missing IDs return `false`. This checks notification state, not app permission or channel settings.
+
+```js
+async function isScheduledExample() {
+    try {
+        const result = await LocalNotifications.isScheduled(1);
+        console.log(result);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+isScheduledExample();
+```
+
+### isTriggered
+
+`isTriggered(id)`.
+
+Check whether a numeric notification ID is currently displayed. Resolves to a boolean; missing IDs return `false`. This checks notification state, not app permission or channel settings.
+
+```js
+async function isTriggeredExample() {
+    try {
+        const result = await LocalNotifications.isTriggered(1);
+        console.log(result);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+isTriggeredExample();
+```
+
+### hasType
+
+`hasType(id, type)`.
+
+Compare a numeric notification ID's state with `scheduled`, `triggered`, or `unknown`. Resolves to a boolean. Unlike [isPresent](#ispresent), `hasType(id, 'unknown')` returns `true` for a missing ID.
+
+```js
+async function hasTypeExample() {
+    try {
+        const missing = await LocalNotifications.hasType(1, 'unknown');
+        console.log('Notification is unknown:', missing);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+hasTypeExample();
+```
+
+### addActions
+
+`addActions(actionsGroupId, actions)`.
+
+Register a reusable action group. `actionsGroupId` is a string; `actions` is an array of action definitions. Await registration before scheduling notifications that use the ID as their `actions` property. Action groups are distinct from Android channel groups. See [Actions](#actions) for platform-specific action properties.
+
+Resolves without a result value. Handle button presses with [on](#on).
+
+```js
+async function addActionsExample() {
+    try {
+        await LocalNotifications.addActions('reminder_actions', [
+            { id: 'OPEN_REMINDER', title: 'Open reminder' }
+        ]);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+addActionsExample();
+```
+
+### removeActions
+
+`removeActions(actionsGroupId)`.
+
+Remove a registered action group by its string ID. This does not cancel the notifications that refer to it. Use [cancel](#cancel) separately when those notifications should also be removed.
+
+Resolves without a result value.
+
+```js
+async function removeActionsExample() {
+    try {
+        await LocalNotifications.removeActions('reminder_actions');
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+removeActionsExample();
+```
+
+### hasActions
+
+`hasActions(actionsGroupId)`.
+
+Check whether an action group with the supplied string ID is registered. Resolves to `true` or `false`; this does not check whether a particular notification currently shows its buttons.
+
+```js
+async function hasActionsExample() {
+    try {
+        const registered = await LocalNotifications.hasActions('reminder_actions');
+        console.log('Action group registered:', registered);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+hasActionsExample();
+```
+
+### on
+
+`on(event, listener)`.
+
+Register a function for a plugin event. `event` is a string; `listener` receives the event arguments. Register listeners after `deviceready`. This method is synchronous and does not return a Promise. See [Events](#events) for event names and payloads.
+
+```js
+const handleClick = (notification, event) => {
+    console.log('Notification clicked:', notification.id, event);
+};
+LocalNotifications.on('click', handleClick);
+```
+
+### un
+
+`un(event, listener)`.
+
+Remove a listener using the same event name and function reference passed to [on](#on). An event with no listeners is ignored. This method is synchronous and does not return a Promise.
+
+```js
+const handleClick = (notification) => console.log(notification.id);
+LocalNotifications.on('click', handleClick);
+LocalNotifications.un('click', handleClick);
+```
+
+### fireEvent
+
+`fireEvent(event, ...args)`.
+
+Invoke registered JavaScript listeners synchronously with the supplied arguments. This does not post a system notification or trigger native notification actions. It is useful for testing event handlers. See [Fire Manually](#fire-manually).
+
+Returns no value and does not return a Promise.
+
+```js
+LocalNotifications.fireEvent('click', { id: 1, data: { appointmentId: 42 } }, { foreground: true });
+```
+
+### fireQueuedEvents
+
+`fireQueuedEvents()`.
+
+Ask the native plugin to deliver queued events after listeners have been registered. Normally the plugin calls this automatically at `deviceready`. Manual use requires the setup in [Launch Details](#launch-details), including `window.skipLocalNotificationReady` before initialization.
+
+Returns no value and does not return a Promise. Event listeners receive the queued events; this call does not wait for their delivery.
+
+```js
+LocalNotifications.fireQueuedEvents();
+```
+
+### getKey
+
+`getKey(object, value)`.
+
+JavaScript utility used by the plugin to find the first object key whose value strictly equals `value`. It does not access notifications or native settings. Applications normally do not need it.
+
+Returns a string, or `undefined` if no value matches. This method is synchronous.
+
+```js
+const name = LocalNotifications.getKey({ normal: 3, high: 4 }, 4);
+console.log(name); // 'high'
+```
 
 ### schedule
 
 Schedule one notification object or an array of notification objects. See [Quick Start](#basics) and [Notification Examples](#notification-examples) for complete examples.
 
-Promise signature: `schedule(options, args)`. The `args` object is optional. See [Callback Compatibility](#callback-compatibility) for older calls. A missing channel is created automatically using the supplied channel properties or the default channel settings.
+`schedule(options, args)`. The `args` object is optional. A missing channel is created automatically using the supplied channel properties or the default channel settings.
 
 ### canScheduleExactAlarms
 <img src="images/android-icon.svg" width="16" alt="Android"> Android only
@@ -1356,6 +1818,22 @@ Promise signature: `schedule(options, args)`. The `args` object is optional. See
 Checks whether Android currently allows exact alarms. Without this permission, the plugin uses inexact scheduling; delivery may be delayed, depending on system and power-saving conditions.
 - On Android 11 and older, the Promise always resolves to `true`.
 - On Android 12 and newer, check the returned status rather than assuming a default. Android 14 denies this permission by default for most new installations targeting API 33 or newer; see [exact alarm permission](#exact-alarms-user-grants-permission).
+
+
+`canScheduleExactAlarms()`. Resolves to a boolean. This is separate from notification permission.
+
+```js
+async function canScheduleExactAlarmsExample() {
+    try {
+        const allowed = await LocalNotifications.canScheduleExactAlarms();
+        console.log('Exact alarms allowed:', allowed);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+canScheduleExactAlarmsExample();
+```
 
 ### createChannel
 <img src="images/android-icon.svg" width="16" alt="Android"> Android only
@@ -1403,14 +1881,30 @@ Property documentation:
 
 Android 8 and newer. Creates a notification channel group or updates its name and description. Existing channels and the user's blocked setting are preserved.
 
-Promise signature: `createChannelGroup({ id, name, description })`.
+`createChannelGroup({ id, name, description })`.
 
 - `id` and `name` must be non-empty strings.
 - `description` is a string or `null`; it is supported on Android 9 and newer. Omitting it clears the description when updating a group.
 - The Promise resolves to `true` on Android 8 and newer, or `false` on Android 7 and iOS.
 
-See [Channel Groups](#channel-groups) for a complete example. Native failures reject the Promise. See [Callback Compatibility](#callback-compatibility) for older calls.
+See [Channel Groups](#channel-groups) for a complete example. Native failures reject the Promise.
 
+
+
+
+
+```js
+async function createChannelGroupExample() {
+    try {
+        const supported = await LocalNotifications.createChannelGroup({ id: 'household', name: 'Household' });
+        console.log('Channel groups supported:', supported);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+createChannelGroupExample();
+```
 
 ### getChannelGroup
 
@@ -1432,7 +1926,7 @@ async function getChannelGroupExample() {
 getChannelGroupExample();
 ```
 
-Promise signature: `getChannelGroup(groupId)`. `groupId` must be a non-empty string. The Promise resolves to `null` for a missing or deleted group, on Android 7, or on iOS. Otherwise the Promise resolves to:
+`getChannelGroup(groupId)`. `groupId` must be a non-empty string. The Promise resolves to `null` for a missing or deleted group, on Android 7, or on iOS. Otherwise the Promise resolves to:
 
 | Field | Type | Meaning |
 | :---- | :--- | :------ |
@@ -1442,7 +1936,7 @@ Promise signature: `getChannelGroup(groupId)`. `groupId` must be a non-empty str
 | `blocked` | boolean | Whether the user has blocked the group. Supported on Android 9 and newer; otherwise `false`. |
 | `channelIds` | string[] | IDs of the group's current, non-deleted channels. |
 
-Native failures reject the Promise. See [Callback Compatibility](#callback-compatibility) for older calls. Group blocking is separate from app permission and individual channel blocking; [getChannel](#getchannel) provides their combined status in `enabled` as well as the individual fields.
+Native failures reject the Promise. Group blocking is separate from app permission and individual channel blocking; [getChannel](#getchannel) provides their combined status in `enabled` as well as the individual fields.
 
 
 ### deleteChannelGroup
@@ -1462,7 +1956,7 @@ async function deleteChannelGroupExample() {
 deleteChannelGroupExample();
 ```
 
-Promise signature: `deleteChannelGroup(groupId)`. `groupId` must be a non-empty string. Deleting an unknown group has no effect. The Promise resolves to `true` on Android 8 and newer, or `false` on Android 7 and iOS. Native failures reject the Promise. See [Callback Compatibility](#callback-compatibility) for older calls.
+`deleteChannelGroup(groupId)`. `groupId` must be a non-empty string. Deleting an unknown group has no effect. The Promise resolves to `true` on Android 8 and newer, or `false` on Android 7 and iOS. Native failures reject the Promise.
 
 
 ### getChannel
@@ -1493,7 +1987,7 @@ async function getChannelExample() {
 getChannelExample();
 ```
 
-Promise signature: `getChannel(channelId)`. `channelId` must be a non-empty string. Native failures reject the Promise. See [Callback Compatibility](#callback-compatibility) for older calls.
+`getChannel(channelId)`. `channelId` must be a non-empty string. Native failures reject the Promise.
 
 The Promise resolves to `null` when the channel does not exist (including a deleted channel), on Android 7, or on iOS. When channels are supported, a missing channel is different from an existing blocked channel. In particular, the default channel may not exist until a notification first creates it.
 
@@ -1611,6 +2105,21 @@ hasPermissionExample();
 ### iOSClearBadge
 Clears the badge.
 
+
+`iOSClearBadge()`. iOS only. Resolves without a result value after clearing the badge; native failures reject the Promise.
+
+```js
+async function iOSClearBadgeExample() {
+    try {
+        await LocalNotifications.iOSClearBadge();
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+iOSClearBadgeExample();
+```
+
 ### openAlarmSettings
 <img src="images/android-icon.svg" width="16" alt="Android"> Android only. Since Android 12 (SDK 31).
 
@@ -1624,6 +2133,21 @@ This method will not wait for the user to be returned back to the app. For this,
 - If the user grants permission, already inexact scheduled notifications will be rescheduled as exact alarms.
 - If exact alarms were already granted and the user revokes it, the app will be killed and all scheduled notifications will be canceled. The app have to schedule the notifications as inexact alarms again, when the app is opened the next time, see https://developer.android.com/develop/background-work/services/alarms/schedule#using-schedule-exact-permission.
 - On Android older than 12, the Promise resolves without opening settings.
+
+
+`openAlarmSettings()`. Opening settings does not imply permission was granted; recheck on `resume`.
+
+```js
+async function openAlarmSettingsExample() {
+    try {
+        await LocalNotifications.openAlarmSettings();
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+openAlarmSettingsExample();
+```
 
 ### openManageUnusedAppRestrictions
 
@@ -1651,6 +2175,21 @@ Opens the notifications settings of the app on Android 8 and newer. This method 
 - On Android, the Promise resolves after opening the settings.
 - On Android older then 8, it opens the app details.
 - On iOS it's not possible to open the notification settings, it will open the app settings.
+
+
+`openNotificationSettings()`. Resolves after the request to open settings completes; it does not wait for the user to return or change a setting.
+
+```js
+async function openNotificationSettingsExample() {
+    try {
+        await LocalNotifications.openNotificationSettings();
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+openNotificationSettingsExample();
+```
 
 ### requestPermission
 Request permission to post notifications. This is called automatically by the plugin when scheduling notifications, but you can also request it manually before scheduling notifications:
@@ -2194,6 +2733,14 @@ Android only.
 A shared file in `[Installed-App-Path]/files/shared_files`. This is necessary to get useable Uris for asset files, which are the files of the `www` directory. You can also use the `shared_files` directory, to store files created on runtime. To access the directory, you can use [cordova.file.dataDirectory](https://github.com/apache/cordova-plugin-file#where-to-store-files) of the plugin [cordova-plugin-file](https://github.com/apache/cordova-plugin-file) and write to the folder `shared_files`. The folder `shared_files` will be created on plugin initialization.
 
 ## Upgrade Notice
+
+### Version 1.2.5 (Upcoming)
+
+- Asynchronous methods support Promises. Use `await` with `try` / `catch`, or `.then()` / `.catch()`, to handle completion and failures.
+- Existing callback-based calls remain supported, including the optional error callbacks added in 1.2.5. Callback-based operation methods are planned for removal in a future version; no removal version has been set. Migrate to Promises. Event listeners such as `on()` and `un()` are unaffected.
+- Permission denial (`false`) and missing channels (`null`) remain normal results. Native errors reject the Promise.
+- The global `LocalNotifications` name is an alias of `cordova.plugins.notification.local`. Existing apps do not need to change their namespace. See [Methods](#methods).
+
 
 ### Version 0.9.0-beta.3 (13.02.2018)
 
