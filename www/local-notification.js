@@ -1010,9 +1010,14 @@ exports._prepareOptions = function (options) {
         options.androidAlarmType = exports._androidAlarmTypes[options.androidAlarmType]
     }
 
-    // Android: channelImportance string to integer
-    if (typeof options.androidChannelImportance === 'string') {
-        options.androidChannelImportance = exports._androidChannelImportanceTypes[options.androidChannelImportance]
+    // Validate the name before calling Android. An unknown name would otherwise
+    // become undefined and silently select the default channel importance.
+    if (device.platform === 'Android' && typeof options.androidChannelImportance === 'string') {
+        if (!Object.prototype.hasOwnProperty.call(exports._androidChannelImportanceTypes, options.androidChannelImportance)) {
+            throw new TypeError('Unknown androidChannelImportance: ' + options.androidChannelImportance +
+                '. Expected one of: ' + Object.keys(exports._androidChannelImportanceTypes).join(', '));
+        }
+        options.androidChannelImportance = exports._androidChannelImportanceTypes[options.androidChannelImportance];
     }
 
     // Due to a Android bug, null values have to be removed

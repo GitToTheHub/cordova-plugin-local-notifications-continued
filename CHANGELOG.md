@@ -2,6 +2,8 @@
 
 ## 1.2.7-dev
 
+- fix(android): reject unknown channel importance names with a descriptive error instead of silently using the default.
+
 ## 1.2.6
 
 - fix(android): synchronize restored notification metadata with the plugin version from `package.json`; automate version updates and check consistency before packaging.

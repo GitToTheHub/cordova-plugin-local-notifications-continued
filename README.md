@@ -373,6 +373,7 @@ Notification permission and Android's **exact alarm permission** are separate. N
 | A reminder arrives later than requested on Android | Check [exact alarm permission](#android-schedule-exact-alarms), [Doze](#doze-and-standby), and battery restrictions. Notification permission alone does not enable exact timing. |
 | A notification replaces an earlier one | Give each notification a unique numeric [ID](#property-id). The default is `1`. |
 | Changing sound or vibration has no effect on Android | Check whether the [channel](#android-channels) already exists. New values do not reset an existing channel's settings. |
+| No banner appears while the app is open on Android | Check the selected channel's [importance](#property-androidchannelimportance). `IMPORTANCE_DEFAULT` normally shows a notification in the drawer; a heads-up banner requires `IMPORTANCE_HIGH` and compatible user settings. The app being open does not by itself suppress notifications. |
 | No banner appears while the app is open on iOS | Check [iOSForeground](#property-iosforeground) and the user's notification settings. |
 | iOS action buttons are not visible | Press and hold the notification to expand it. See [Actions](#actions). |
 | A custom image or sound cannot be found | Check the property's supported platforms and [resource patterns](#resource-resolving). |
@@ -985,7 +986,7 @@ async function androidChannelWithACustomSoundExample() {
 androidChannelWithACustomSoundExample();
 ```
 
-On Android 8 and newer, [`schedule()`](#schedule) creates the channel automatically if needed and sets its sound. The default importance is [`IMPORTANCE_DEFAULT`](#property-androidchannelimportance), so it does not need to be specified. Each notification selects that channel using the same [`androidChannelId`](#property-androidchannelid). The [`sound`](#property-sound) on the notification also supports Android 7, which has no channels.
+On Android 8 and newer, [`schedule()`](#schedule) creates the channel automatically if needed and sets its sound. The default importance is [`IMPORTANCE_DEFAULT`](#property-androidchannelimportance), so it does not need to be specified. Expect the notification in the notification drawer. For a heads-up banner, create a new channel with [`IMPORTANCE_HIGH`](#property-androidchannelimportance), subject to the user's settings. Each notification selects that channel using the same [`androidChannelId`](#property-androidchannelid). The [`sound`](#property-sound) on the notification also supports Android 7, which has no channels.
 
 If you already created this channel ID with another sound (or without sound), changing the code will not replace its sound. Deleting the channel and recreating it with the same ID also restores its previous settings; see [Android: deleteNotificationChannel](https://developer.android.com/reference/android/app/NotificationManager#deleteNotificationChannel(java.lang.String)). During development, test with a new channel ID. In a released app, respect the user's channel settings; users can change the sound or disable the channel in Android settings. App notification permission alone does not guarantee that the channel is audible: channel settings, silent mode, volume, and Do Not Disturb can affect it.
 
@@ -2429,7 +2430,7 @@ Sets the `channelId` for the notification to be posted on. Use [Snake Case](http
 #### Property `androidChannelImportance`
 Default: `"IMPORTANCE_DEFAULT"`
 
-The property can have one of the following values:
+On Android, an unknown importance name raises a `TypeError` (a rejected Promise when using the Promise API). Supported names are listed below.
 
 | Value            | Description |
 |:-----------------|:------------|
@@ -2438,7 +2439,9 @@ The property can have one of the following values:
 | [IMPORTANCE_LOW](https://developer.android.com/reference/androidx/core/app/NotificationManagerCompat#IMPORTANCE_LOW()) | Low notification importance: shows everywhere, but is not intrusive. |
 | [IMPORTANCE_DEFAULT](https://developer.android.com/reference/androidx/core/app/NotificationManagerCompat#IMPORTANCE_DEFAULT()) | Default notification importance: shows everywhere, allowed to makes noise, but does not visually intrude. |
 | [IMPORTANCE_HIGH](https://developer.android.com/reference/androidx/core/app/NotificationManagerCompat#IMPORTANCE_HIGH()) | Higher notification importance: shows everywhere, allowed to makes noise and peek. |
-| [IMPORTANCE_MAX](https://developer.android.com/reference/androidx/core/app/NotificationManagerCompat#IMPORTANCE_MAX()) | Highest notification importance: shows everywhere, allowed to makes noise, peek, and use full screen intents. |
+| [IMPORTANCE_MAX](https://developer.android.com/reference/androidx/core/app/NotificationManagerCompat#IMPORTANCE_MAX()) | Reserved for system use on modern Android. Use `IMPORTANCE_HIGH` for application notifications requiring a heads-up banner. |
+
+Channel importance controls visual and audible interruption. [`androidChannelSoundUsage`](#property-androidchannelsoundusage) describes the audio usage, such as notification or alarm audio; it does not increase channel importance. Select the intended channel through [`androidChannelId`](#property-androidchannelid). Existing channel settings are not overwritten by later scheduling calls.
 
 See the [Android documentation](https://developer.android.com/develop/ui/views/notifications#importance) about this property.
 
