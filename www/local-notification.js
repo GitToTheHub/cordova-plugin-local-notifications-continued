@@ -22,6 +22,10 @@
 var exec    = require('cordova/exec'),
     channel = require('cordova/channel');
 
+// schedule() accepts a slightly overdue trigger.at for immediate delivery.
+// At this age or older, the request is skipped.
+const OVERDUE_GRACE_MS = 5000;
+
 // Options for every platform
 exports._commonOptions = {
     actions: [],
@@ -455,41 +459,34 @@ exports.schedule = function (optionsArg, callback, errorCallback, args) {
         return exports._promise('schedule', arguments, 1);
     }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
-    let optionsList = exports._toArray(optionsArg);
-
-    for (let i = 0; i < optionsList.length; i++) {
-        let options = exports._optionsWithDefaults(optionsList[i])
+    const optionsList = exports._toArray(optionsArg).map(input => {
+        const options = exports._optionsWithDefaults(input);
         exports._prepareOptions(options);
-        // Store back the prepared options
-        optionsList[i] = options;
-    }
-
-    // Filter out notifications where the trigger time is in the past
-    // On iOS notifications are ignored if the trigger time is in the past, so filter
-    // them already here out
-    optionsList = optionsList.filter((options) => {
-
-        // Don't filter out, if trigger.at is not set
-        if (!options.trigger || !options.trigger.at) {
-            return true;
-        }
-
-        // Calculate difference to now
-        const triggerAtDiff = options.trigger.at - new Date().getTime();
-
-        // Trigger time is in the future don't filter out
-        if (triggerAtDiff > 0) return true;
-
-        // Trigger time is in the past, filter out
-        console.warn("Notification trigger time is in the past, ignoring it, options=", JSON.stringify(options));
-
-        return false;
+        // Trigger normalization writes timestamps and defaults into this copy.
+        // Callers may reuse the original trigger for another notification.
+        options.trigger = Object.assign({}, options.trigger);
+        return options;
     });
+
+    function scheduleGranted() {
+        // The permission dialog can outlast a reminder. Check all dates against
+        // one timestamp immediately before passing the batch to native code.
+        const now = Date.now();
+        const eligible = optionsList.filter(options => {
+            exports._prepareTrigger(options, now);
+            const at = options.trigger.at;
+            if (at == null || at - now > -OVERDUE_GRACE_MS) return true;
+
+            console.warn("Notification trigger time is in the past, ignoring it, options=", JSON.stringify(options));
+            return false;
+        });
+        exports._exec('schedule', eligible, callback, scope, errorCallback);
+    }
 
     // Skip permission check if requested and schedule directly
     if (args && args.skipPermission) {
         console.log("Skip permission check");
-        exports._exec('schedule', optionsList, callback, scope, errorCallback);
+        scheduleGranted();
 
         // Ask for permission
     } else {
@@ -501,7 +498,7 @@ exports.schedule = function (optionsArg, callback, errorCallback, args) {
                 return;
             }
 
-            exports._exec('schedule', optionsList, callback, scope, errorCallback);
+            scheduleGranted();
         }, exports._callbackWithScope(errorCallback, scope));
     }
 };
@@ -521,14 +518,17 @@ exports.update = function (options, callback, errorCallback, args) {
         return exports._promise('update', arguments, 1);
     }
     const scope = typeof errorCallback === 'function' ? undefined : errorCallback;
-    const optionsList = exports._toArray(options);
-
-    for (const options of optionsList) {
-        // Correct renamed properties and don't merge defaults
-        // The defaults are not merged, because otherwise, some values
-        // could be set back to a default value
+    const optionsList = exports._toArray(options).map(input => {
+        const options = Object.assign({}, input);
+        // An update carries only the supplied fields. In particular, an omitted
+        // trigger leaves the stored schedule in place during the native merge.
         exports._prepareOptions(options);
-    }
+        if (options.trigger != null) {
+            options.trigger = Object.assign({}, options.trigger);
+            exports._prepareTrigger(options, Date.now());
+        }
+        return options;
+    });
 
     // Skip permission check if requested and update directly
     if (args && args.skipPermission) {
@@ -1000,7 +1000,6 @@ exports._prepareOptions = function (options) {
     // No auto cancelling, if the notification is ongoing
     if (options.androidOngoing) options.androidAutoCancel = false
 
-    exports._prepareTrigger(options);
     exports._prepareActions(options);
     exports._prepareAndroidProgressBar(options);
 
@@ -1175,39 +1174,29 @@ exports._prepareActions = function (options) {
 };
 
 /**
- * Convert the passed values for the trigger to their required type.
- * @param {Object} options
+ * Normalize a notification's trigger in place for the native bridge.
+ * @param {Object} options Notification options containing a writable trigger object.
+ * @param {number} now Unix time in milliseconds to use for immediate Android delivery.
  * @return {Object} Converted options
  */
-exports._prepareTrigger = function (options) {
-    let trigger = options.trigger || {};
+exports._prepareTrigger = function (options, now) {
+    const trigger = options.trigger;
 
     // Set trigger type
     if (!trigger.type) trigger.type = trigger.center ? "location" : "calendar";
 
     if (trigger.type == "calendar") {
-        // Set default trigger time at now if nothing is set
-        if (!trigger.at && !trigger.in && !trigger.every) trigger.at = new Date().getTime();
+        // Android requires a timestamp; iOS can request immediate delivery with no native trigger.
+        // Do not turn an immediate request into a future alarm just to avoid a past timestamp.
+        if (device.platform === 'Android' && trigger.at == null && !trigger.in && !trigger.every) {
+            trigger.at = now;
+        }
 
         // Convert dates to numbers
         if (trigger.at) trigger.at = exports._dateToNumber(trigger.at);
         if (trigger.firstAt) trigger.firstAt = exports._dateToNumber(trigger.firstAt);
         if (trigger.before) trigger.before = exports._dateToNumber(trigger.before);
         if (trigger.after) trigger.after = exports._dateToNumber(trigger.after);
-
-        // On iOS notifications will be ignored if the trigger time is in the past
-        // Correct trigger.at if trigger time is maximum 5 seconds in the past
-        if (trigger.at) {
-            // Calculate the difference to now
-            const triggerAtDiff = trigger.at - new Date().getTime();
-
-            // Only correct if maximum 5 seconds in the past
-            if (triggerAtDiff > -5000 && triggerAtDiff <= 0) {
-                // Set it a little bit in the future so it will be definitely triggered
-                trigger.at = new Date().getTime() + 5000;
-                console.log("Correct trigger.at 5 seconds in the future because it was a bit in the past, new trigger.at=" + trigger.at);
-            }
-        }
 
         //  Warning that trigger.count is not supported on iOS
         if (device.platform == 'iOS' && trigger.count) {
@@ -1221,8 +1210,6 @@ exports._prepareTrigger = function (options) {
         trigger.radius = trigger.radius || 5;
         trigger.single = !!trigger.single;
     }
-
-    options.trigger = trigger;
 
     return options;
 };

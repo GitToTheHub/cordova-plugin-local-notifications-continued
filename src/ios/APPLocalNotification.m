@@ -412,9 +412,19 @@
             if (!existing) continue;
             options = [existing.content.userInfo mutableCopy];
             [options addEntriesFromDictionary:supplied];
+            if (supplied[@"trigger"]) {
+                // A replacement trigger defines its own deadline, even if the old one was relative.
+                [options removeObjectForKey:@"relativeTriggerDate"];
+            } else if (!options[@"relativeTriggerDate"] && options[@"trigger"][@"in"] &&
+                       [existing.trigger isKindOfClass:UNTimeIntervalNotificationTrigger.class] && !existing.trigger.repeats) {
+                // Older builds stored the interval alone. Ask the existing native
+                // trigger for its next date before replacing the request.
+                options[@"relativeTriggerDate"] = [(UNTimeIntervalNotificationTrigger*)existing.trigger nextTriggerDate];
+            }
             options[@"updatedAt"] = [NSDate date];
         } else {
             options = [supplied mutableCopy];
+            [options removeObjectForKey:@"relativeTriggerDate"];
         }
         break;
     }
@@ -453,18 +463,41 @@
 #pragma mark UNUserNotificationCenterDelegate
 
 /**
- * The method will be called on the delegate only if the application is in the foreground.
+ * Handle only this plugin's local requests. Other plugins may own remote or
+ * local notifications and must retain control of their presentation and events.
+ * Accept the original plugin name for notifications scheduled before the fork.
+ */
+- (BOOL) isPluginNotification:(UNNotificationRequest*)request
+{
+    if ([request.trigger isKindOfClass:UNPushNotificationTrigger.class]) return NO;
+    id meta = request.content.userInfo[@"meta"];
+    if (![meta isKindOfClass:NSDictionary.class]) return NO;
+    id plugin = meta[@"plugin"];
+    return [plugin isEqual:@"cordova-plugin-local-notifications-continued"] ||
+           [plugin isEqual:@"cordova-plugin-local-notification"];
+}
+
+/**
+ * iOS asks for presentation options while the app is in the foreground.
+ * Forwarding a foreign request gives the previous delegate responsibility for
+ * calling completionHandler. If it has no such method, complete here with no presentation.
  */
 - (void) userNotificationCenter:(UNUserNotificationCenter *)center
         willPresentNotification:(UNNotification *)notification
           withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler
 {
-    [_delegate userNotificationCenter:center
-              willPresentNotification:notification
-                withCompletionHandler:completionHandler];
+    if (![self isPluginNotification:notification.request]) {
+        id<UNUserNotificationCenterDelegate> delegate = self.delegate;
+        if ([delegate respondsToSelector:_cmd]) {
+            [delegate userNotificationCenter:center
+                    willPresentNotification:notification
+                      withCompletionHandler:completionHandler];
+        } else {
+            completionHandler(UNNotificationPresentationOptionNone);
+        }
+        return;
+    }
 
-    if ([notification.request.trigger isKindOfClass:UNPushNotificationTrigger.class]) return;
-    
     APPNotificationOptions* notificationOptions = notification.request.options;
     NSLog(@"Handle notification while app is in foreground: %@", notificationOptions);
     
@@ -507,8 +540,8 @@
 }
 
 /**
- * Called to let your app know which action was selected by the user for a given
- * notification.
+ * Forward foreign responses with their completion handler. For a local response,
+ * record the launch details and dispatch the Cordova events before completing.
  */
 - (void) userNotificationCenter:(UNUserNotificationCenter *)center
  didReceiveNotificationResponse:(UNNotificationResponse *)response
@@ -516,13 +549,17 @@
 {
     UNNotificationRequest* toast = response.notification.request;
 
-    [_delegate userNotificationCenter:center
-       didReceiveNotificationResponse:response
-                withCompletionHandler:handler];
-
-    handler();
-
-    if ([toast.trigger isKindOfClass:UNPushNotificationTrigger.class]) return;
+    if (![self isPluginNotification:toast]) {
+        id<UNUserNotificationCenterDelegate> delegate = self.delegate;
+        if ([delegate respondsToSelector:_cmd]) {
+            [delegate userNotificationCenter:center
+             didReceiveNotificationResponse:response
+                      withCompletionHandler:handler];
+        } else {
+            handler();
+        }
+        return;
+    }
 
     NSString* action = response.actionIdentifier;
     NSString* event = action;
@@ -550,6 +587,7 @@
     }
 
     [self fireEvent:event notification:toast data:data];
+    handler();
 }
 
 #pragma mark -

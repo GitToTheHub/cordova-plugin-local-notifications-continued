@@ -80,9 +80,7 @@ static char optionsKey;
 - (NSString*) encodeToJSON
 {
     NSString* json;
-    NSMutableDictionary* obj = [self.content.userInfo mutableCopy];
-
-    [obj removeObjectForKey:@"updatedAt"];
+    NSDictionary* obj = self.options.userInfo;
 
     if (obj == NULL || obj.count == 0) return json;
 

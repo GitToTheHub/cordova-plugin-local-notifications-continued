@@ -228,16 +228,18 @@ static NSInteger WEEKDAYS[8] = { 0, 2, 3, 4, 5, 6, 7, 1 };
 }
 
 /**
- * The notification's user info dict.
+ * Notification options exposed through Cordova queries and events. The native
+ * request retains its internal update marker and relative deadline in content.userInfo.
  *
  * @return [ NSDictionary* ]
  */
 - (NSDictionary*) userInfo
 {
-    if (dict[@"updatedAt"]) {
+    if (dict[@"updatedAt"] || dict[@"relativeTriggerDate"]) {
         NSMutableDictionary* data = [dict mutableCopy];
 
         [data removeObjectForKey:@"updatedAt"];
+        [data removeObjectForKey:@"relativeTriggerDate"];
 
         return data;
     }
@@ -284,15 +286,26 @@ static NSInteger WEEKDAYS[8] = { 0, 2, 3, 4, 5, 6, 7, 1 };
 }
 
 /**
- * Non repeating trigger.
- *
- * @return [ UNTimeIntervalNotificationTrigger* ]
+ * Build a one-time trigger. An explicit date or a saved relative deadline is
+ * converted to the remaining interval. A nil trigger requests immediate delivery.
  */
 - (UNNotificationTrigger*) nonRepeatingTrigger
 {
-    if ([self valueForTriggerOption:@"at"]) {
-        return [self triggerWithDateMatchingComponents:NO];
+    NSDate* deadline = [self valueForTriggerOption:@"at"] ? [self triggerDate] : dict[@"relativeTriggerDate"];
+    if ([deadline isKindOfClass:NSDate.class]) {
+        NSTimeInterval interval = [deadline timeIntervalSinceNow];
+
+        // schedule() already checked eligibility after the permission dialog.
+        if (interval <= 0) return nil;
+
+        // A calendar trigger drops milliseconds and can already be in the past by
+        // the time iOS receives it. A relative interval preserves a future instant.
+        return [UNTimeIntervalNotificationTrigger triggerWithTimeInterval:interval repeats:NO];
     }
+
+    // Apple specifies a nil request trigger for immediate delivery. This also
+    // avoids tying delivery to when JavaScript ran, before a permission dialog.
+    if (![self valueForTriggerOption:@"in"]) return nil;
 
     return [UNTimeIntervalNotificationTrigger triggerWithTimeInterval:[self timeInterval] repeats:NO];
 }

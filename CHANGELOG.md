@@ -2,7 +2,12 @@
 
 ## 1.2.7-dev
 
+- fix: request immediate notifications without an artificial five-second delay, preserving the grace period for slightly overdue timestamps.
+- fix(ios): isolate local notifications from other notification delegates and complete presentation and response callbacks exactly once; preserve future one-off timestamps without calendar-second rounding.
+- fix: preserve the stored trigger when updating notification text.
+- fix(android): cancel the previous alarm when replacing a scheduled ID with an immediate notification.
 - fix(android): reject unknown channel importance names with a descriptive error instead of silently using the default.
+- docs: clarify scheduling completion, banner visibility, unique notification IDs, iOS delegate integration, and custom sound packaging.
 
 ## 1.2.6
 
