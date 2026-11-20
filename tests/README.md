@@ -68,3 +68,11 @@ npm version 1.2.7-dev --no-git-tag-version
 ```
 
 The `version` script synchronizes the other files from `package.json`. Review and commit all changed files together before creating a release tag. The changelog and release notes are maintained separately. If `package.json` was edited manually, run `node scripts/sync-version.js`. Never change the fixed migration thresholds in `Options.java` just to bump the plugin version.
+
+## Notification Delivery Regressions
+
+`notification-delivery.test.js` checks immediate requests on Android and iOS, the five-second grace period, expired timestamps, future dates, relative and repeating triggers, time spent requesting permission, text-only updates, and invalid channel importance values.
+
+On macOS with Xcode command line tools, `ios-notifications.test.js` compiles the production date/time option code and the production notification delegate methods against Apple's Foundation and UserNotifications frameworks. It checks real native trigger dates, immediate requests, subsecond scheduling, dates that become due before native submission, and repeating calendar behavior. Notification wrappers and a second delegate simulate local, foreign, and push requests to check ownership, presentation flags, events, and exactly one completion, including missing optional delegate methods. The unrelated iOS-only location method is replaced by a failing stub for the macOS probe; location delivery is not exercised. Other platforms skip this native probe.
+
+These are native logic checks, not a device UI test of banners, sound, permission dialogs, or another specific push plugin.

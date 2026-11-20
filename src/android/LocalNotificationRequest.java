@@ -231,8 +231,10 @@ public class LocalNotificationRequest {
         // Needed for ClickActivity and ClearReceiver
         storeInSharedPreferences();
 
-        // Date is in the past, show directly
         if (!triggerDate.after(new Date())) {
+            // Direct delivery bypasses AlarmManager's PendingIntent replacement.
+            // Cancel any alarm for this ID so it cannot post the replacement a second time.
+            cancelScheduledAlarm();
             show(false);
             scheduleNext();
             return false;

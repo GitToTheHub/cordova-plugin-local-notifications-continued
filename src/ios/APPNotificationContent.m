@@ -93,9 +93,18 @@ static char optionsKey;
 {
     APPNotificationOptions* options = [self getOptions];
     
+    UNNotificationTrigger* trigger = options.trigger;
+    if (self.userInfo[@"trigger"][@"in"] && !self.userInfo[@"relativeTriggerDate"] &&
+        [trigger isKindOfClass:UNTimeIntervalNotificationTrigger.class] && !trigger.repeats) {
+        // relativeTriggerDate is private iOS metadata for one-time trigger.in requests.
+        // An update without a new trigger reuses this date to avoid restarting the interval.
+        NSMutableDictionary* userInfo = [self.userInfo mutableCopy];
+        userInfo[@"relativeTriggerDate"] = [(UNTimeIntervalNotificationTrigger*)trigger nextTriggerDate];
+        self.userInfo = userInfo;
+    }
     return [UNNotificationRequest requestWithIdentifier:options.identifier
                                                 content:self
-                                                trigger:options.trigger];
+                                                trigger:trigger];
 }
 
 #pragma mark -

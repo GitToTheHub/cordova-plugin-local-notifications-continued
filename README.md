@@ -375,6 +375,8 @@ Notification permission and Android's **exact alarm permission** are separate. N
 | Changing sound or vibration has no effect on Android | Check whether the [channel](#android-channels) already exists. New values do not reset an existing channel's settings. |
 | No banner appears while the app is open on Android | Check the selected channel's [importance](#property-androidchannelimportance). `IMPORTANCE_DEFAULT` normally shows a notification in the drawer; a heads-up banner requires `IMPORTANCE_HIGH` and compatible user settings. The app being open does not by itself suppress notifications. |
 | No banner appears while the app is open on iOS | Check [iOSForeground](#property-iosforeground) and the user's notification settings. |
+| Local notifications appear in another plugin's push handler on iOS | Use the current plugin build. Local notifications from this plugin should be handled here, while other notifications are forwarded to the previous iOS notification delegate. See [iOSForeground](#property-iosforeground) for integration requirements. |
+| A completion log appears before the permission result | Await [`schedule()`](#schedule) before logging that scheduling completed. Completion does not mean the notification has been displayed. |
 | iOS action buttons are not visible | Press and hold the notification to expand it. See [Actions](#actions). |
 | A custom image or sound cannot be found | Check the property's supported platforms and [resource patterns](#resource-resolving). |
 
@@ -619,6 +621,12 @@ These properties can additionally be specified for an `input` action:
 ## Triggers
 
 Notifications may trigger immediately or depend on calendar or location.
+
+Omit `trigger` to request immediate delivery. On iOS, the plugin uses Apple's [request without a native trigger](https://developer.apple.com/documentation/usernotifications/unnotificationrequest/init(identifier:content:trigger:)); a calendar date that has already passed is not a reliable way to request immediate delivery. On Android, the plugin posts an already-due notification directly.
+
+After the permission check, `schedule()` skips explicit timestamps that are five seconds or more in the past. A one-off timestamp less than five seconds overdue requests immediate delivery. A future one-off iOS timestamp is converted to a native time interval so subsecond dates are not rounded down to an already-past calendar second. Repeating calendar triggers retain their calendar behavior.
+
+`await schedule(...)` waits for the scheduling operation, including its permission check, to finish. It does not wait until a notification is delivered, displayed, or clicked. System settings still determine sound and banner presentation. Use a distinct [ID](#property-id) for each notification you want to keep; scheduling another notification with the same ID replaces the earlier request, even when both calls are awaited.
 
 ### Fixed Date
 Trigger at a fixed date:
@@ -1347,6 +1355,8 @@ In the table, **pending** means scheduled for future delivery; **delivered** mea
 
 Update existing notifications by numeric ID. Accepts one object or an array; each object must contain `id`. Unknown IDs are ignored. Unspecified properties remain unchanged. The optional `args` supports `skipPermission` as described under [schedule](#schedule).
 
+On iOS, a one-time notification scheduled with `trigger.in` keeps its original delivery time when an update omits `trigger`. For example, if you schedule a notification for 30 minutes from now and edit its text 10 minutes later, it is still due in 20 minutes. The plugin stores the original delivery time in `relativeTriggerDate` in the native notification’s `userInfo` for this case. This field is internal to the iOS plugin. Apps configure delivery through `trigger`, and the plugin omits the internal field from notification options returned to JavaScript. Supplying a new `trigger` replaces the previous schedule on iOS.
+
 On Android, this merges stored options and refreshes a currently displayed notification; changing `trigger` does not recalculate an already scheduled alarm. To change delivery time consistently across platforms, call [schedule](#schedule) with the same ID and the complete new options instead.
 
 Resolves to the current app-level notification permission status. Permission denial is `false`; native failures reject the Promise. On iOS, completion waits for native update requests.
@@ -1812,6 +1822,8 @@ console.log(name); // 'high'
 Schedule one notification object or an array of notification objects. See [Quick Start](#basics) and [Notification Examples](#notification-examples) for complete examples.
 
 `schedule(options, args)`. The `args` object is optional. A missing channel is created automatically using the supplied channel properties or the default channel settings.
+
+The Promise resolves with the permission status after native scheduling completes. A `true` result means app-level permission is granted. It can also be returned when all requested timestamps were skipped as expired. A `false` result means app-level notification permission was denied. Native errors and invalid option values reject the Promise. On Android, unknown string values for [`androidChannelImportance`](#property-androidchannelimportance) reject with `TypeError` before a native request is sent. For immediate delivery and past timestamps, see [Triggers](#triggers).
 
 ### canScheduleExactAlarms
 <img src="images/android-icon.svg" width="16" alt="Android"> Android only
@@ -2606,6 +2618,10 @@ Default: `true`
 
 Displays a notification banner when the app is in foreground, otherwise the notification would only make a noise (sound and vibrate), change the badge, but is not shown as a banner. Since iOS 14, the notification is always displayed in the Notification Center, no matter how this option is set to be consistent with Android. Renamed from `foreground` to [`iOSForeground`](#property-iosforeground) and changed to `true` by default in Version `1.1.0`.
 
+A banner still requires the user's notification settings to allow it. [`silent`](#common-properties) suppresses foreground presentation, including sound. A successful permission check does not guarantee banners or audible alerts.
+
+When combining this plugin with a push-notification plugin, both must preserve the `UNUserNotificationCenter` delegate chain. This plugin handles its own local notifications and forwards other notifications to the previously registered delegate. A plugin that subsequently replaces the delegate without forwarding notifications can prevent this plugin from receiving them. Avoid installing multiple local-notification plugins together: they may use the same JavaScript namespace and native notification delegate.
+
 #### Property `priority`
 Default: `0` (=PRIORITY_DEFAULT)
 
@@ -2639,6 +2655,16 @@ Before Android 8 it sets the sound of a notification. Since Android 8 it sets th
 
 ##### iOS
 Enables/disables also the vibration. If no sound is set, no vibration will occur.
+
+For a custom sound, `res://reminder.wav` resolves to `reminder.wav` in the app bundle. A file under `www/audio/` is not automatically a root-bundle resource. Package it explicitly in `config.xml`, rebuild the native app, and use `sound: 'res://reminder.wav'`:
+
+```xml
+<platform name="ios">
+    <resource-file src="www/audio/reminder.wav" target="reminder.wav" />
+</platform>
+```
+
+The Android [custom sound example](#android-channel-with-a-custom-sound) uses an MP3 file. For an iOS sound, choose one of the supported formats below and check its encoding and length; using the same path string on both platforms does not guarantee that the file is packaged or supported on both.
 
 You can package the audio data in an `aiff`, `wav`, or `caf` file. Sound files must be less than 30 seconds in length.
 If the sound file is longer than 30 seconds, the system plays the default sound instead. See [UNNotificationSound - Prepare Sound Resources](https://developer.apple.com/documentation/usernotifications/unnotificationsound?language=objc#Prepare-Sound-Resources).
@@ -2790,7 +2816,7 @@ Notifications with an old `trigger.at` date will be shown when you schedule them
 
 ### Updates in Version 1.1.8
 
-- Notifications with `trigger.at` date more than 5 seconds in the past will be ignored. iOS did always ignore passed notifications.
+- Added a grace period for overdue timestamps. See [Triggers](#triggers) for current scheduling behavior.
 - If no [id](#property-id) of a notification is set, it will default to `1` instead of `0`.
 
 ## License
